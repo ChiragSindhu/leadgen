@@ -1,5 +1,10 @@
 .env
-*.db*
+*.db
+*.db-wal
+*.db-shm
 __pycache__/
 .venv/
-.git/
+*.pyc
+leads.json
+maps_leads.json
+.DS_Store
