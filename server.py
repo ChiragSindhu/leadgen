@@ -9,7 +9,17 @@ app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(16)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE") == "1")
 PW = os.getenv("ADMIN_PASSWORD") or secrets.token_urlsafe(8)
 if not os.getenv("ADMIN_PASSWORD"): print("ADMIN_PASSWORD not set. Temporary password:", PW)
-JOB = {"running": False, "msg": "idle"}
+class Job(dict):
+    """Search progress. Every real change bumps 'v' so clients can ask 'anything new since v?' and get an empty reply."""
+    def __setitem__(self, k, val):
+        if k != "v" and self.get(k) != val: super().__setitem__("v", self.get("v", 0) + 1)
+        super().__setitem__(k, val)
+    def update(self, *a, **kw):
+        for k, val in dict(*a, **kw).items(): self[k] = val
+JOB = Job(running=False, msg="idle", v=0)
+
+_c = P.db()   # a restart kills running searches: close their log entries instead of leaving them 'running' forever
+_c.execute("UPDATE runs SET status='failed', error='Interrupted by a server restart', finished_at=? WHERE status='running'", (P.now(),)); _c.commit(); _c.close()
 
 @app.before_request
 def guard():
@@ -38,7 +48,7 @@ def logout(): session.clear(); return jsonify(ok=True)
 @app.get("/api/stats")
 def stats():
     c = P.db(); q = lambda s: c.execute(s).fetchone()[0]
-    out = dict(total=q("SELECT COUNT(*) FROM leads WHERE dup_of IS NULL"), ready=len(P.sendable(c, 100000)),
+    out = dict(total=q("SELECT COUNT(*) FROM leads WHERE dup_of IS NULL"), ready=P.sendable_count(c),
                with_phone=q("SELECT COUNT(*) FROM leads WHERE dup_of IS NULL AND phone IS NOT NULL"),
                contacted=q("SELECT COUNT(*) FROM leads WHERE outreach!='new'"),
                warm=q("SELECT COUNT(*) FROM leads WHERE outreach IN ('replied','interested')"),
@@ -51,7 +61,7 @@ def leads():
     if q := request.args.get("q"): w.append("(name LIKE ? OR phone LIKE ? OR address LIKE ?)"); a += [f"%{q}%"] * 3
     if s := request.args.get("status"): w.append("outreach=?"); a.append(s)
     if request.args.get("mobile") == "1": w.append("is_mobile=1")
-    return jsonify(rows("SELECT id,name,category,phone,is_mobile,website,address,score,outreach,notes,source FROM leads "
+    return jsonify(rows("SELECT id,name,category,phone,is_mobile,score,outreach FROM leads "
                         f"WHERE {' AND '.join(w)} ORDER BY score DESC, first_seen DESC LIMIT 300", *a))
 
 @app.post("/api/leads")
@@ -139,7 +149,7 @@ def runs(): return jsonify(rows("SELECT * FROM runs ORDER BY id DESC LIMIT 100")
 def run_detail(rid):
     r = rows("SELECT * FROM runs WHERE id=?", rid)
     if not r: return jsonify(error="not found"), 404
-    return jsonify(run=r[0], events=rows("SELECT at,kind,text FROM run_events WHERE run_id=? ORDER BY id", rid))
+    return jsonify(run=r[0], events=rows("SELECT * FROM (SELECT id,at,kind,text FROM run_events WHERE run_id=? ORDER BY id DESC LIMIT 300) ORDER BY id", rid))
 
 @app.get("/api/leads/<path:lid>")
 def detail(lid):
@@ -151,7 +161,9 @@ def detail(lid):
     c.close(); return jsonify(d)
 
 @app.get("/api/job")
-def job(): return jsonify(JOB)
+def job():
+    if request.args.get("v", type=int) == JOB["v"]: return "", 204   # nothing changed: empty reply
+    return jsonify(JOB)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

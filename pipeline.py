@@ -46,17 +46,21 @@ CREATE INDEX IF NOT EXISTS idx_phone ON leads(phone);
 
 def now(): return dt.datetime.now().isoformat(timespec="seconds")
 
+_READY = set()
+MIGRATIONS = [("leads", "dup_of", "TEXT"), ("leads", "contacted_at", "TEXT"), ("runs", "calls", "INT DEFAULT 0"),
+              ("runs", "location", "TEXT"), ("runs", "status", "TEXT DEFAULT 'done'"), ("runs", "finished_at", "TEXT"),
+              ("runs", "requested", "INT"), ("runs", "error", "TEXT")]
+
 def db():
     c = sqlite3.connect(DB, check_same_thread=False, timeout=30); c.row_factory = sqlite3.Row
-    c.execute('PRAGMA journal_mode=WAL')   # dashboard + bot can share the file safely
-    c.executescript(SCHEMA)
-    for t, col, typ in [("leads", "dup_of", "TEXT"), ("leads", "contacted_at", "TEXT"),
-                        ("runs", "calls", "INT DEFAULT 0"), ("runs", "location", "TEXT"),
-                        ("runs", "status", "TEXT DEFAULT 'done'"), ("runs", "finished_at", "TEXT"),
-                        ("runs", "requested", "INT"), ("runs", "error", "TEXT")]:   # migrate older DBs
-        if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]:
-            c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {typ}")
-    c.commit(); return c
+    if DB not in _READY:            # schema + migrations run once per process, not on every request
+        c.execute("PRAGMA journal_mode=WAL")
+        c.executescript(SCHEMA)
+        for t, col, typ in MIGRATIONS:
+            if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]:
+                c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {typ}")
+        c.commit(); _READY.add(DB)
+    return c
 
 def norm_phone(raw, region=None):
     """Return (E.164 number or None, is_mobile). Handles 'a; b' lists, picks a mobile first."""
@@ -352,3 +356,6 @@ def sendable(c, n, exclude=()):
 def sent_today(c):
     return c.execute("SELECT COUNT(*) FROM leads WHERE contacted_at LIKE ? AND outreach IN ('messaged','replied','interested','not_interested')",
                      (dt.date.today().isoformat() + "%",)).fetchone()[0]
+
+def sendable_count(c):
+    return c.execute(f"SELECT COUNT(*) FROM leads WHERE {SENDABLE}").fetchone()[0]

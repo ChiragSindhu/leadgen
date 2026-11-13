@@ -1,4 +1,4 @@
-# Lead Desk
+# Vansh Lead
 
 Find local businesses, keep a clean lead database, and message them in small human-sized batches.
 One Flask server serves the admin web app (works on phone and desktop); an optional Telegram bot controls the same data.

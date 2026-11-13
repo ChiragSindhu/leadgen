@@ -1,22 +1,12 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f6f4ee"><title>Vansh Lead</title>
-<script src="static/lucide.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.462.0/dist/umd/lucide.min.js"></script>
 <style>
 :root{--bg:#f6f4ee;--sage:#7d8f6e;--sd:#3f4d37;--sl:#e1e8d8;--ink:#232a1f;--mut:#6f7866;--tom:#e5533d;--glass:rgba(255,255,255,.62);--ln:rgba(255,255,255,.8)}
 [hidden]{display:none!important}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-    font-size: 15px;
-    line-height: 1.5;
-    color: #1d1d1f;
-    background: #f5f5f7;
-    min-height: 100vh;
-    font-feature-settings: "tnum";
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-}
+body{margin:0;font:15px/1.5 Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;font-feature-settings:"tnum"}
 body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(560px 420px at 6% -4%,#d5dfc9,transparent 70%),radial-gradient(520px 400px at 100% 100%,#dfe7d5,transparent 70%)}
 i[data-lucide],svg.lucide{width:18px;height:18px;stroke-width:1.8;flex:none}
 .glass{background:var(--glass);backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);border:1px solid var(--ln);border-radius:20px;box-shadow:0 1px 2px rgba(40,55,30,.05),0 12px 32px rgba(40,55,30,.07)}
@@ -83,14 +73,15 @@ dialog{border:0;padding:0;background:transparent;max-width:520px;width:calc(100%
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ic=n=>`<i data-lucide="${n}"></i>`,draw=()=>lucide.createIcons(),ST=['new','messaged','replied','interested','not_interested','bad_number','do_not_contact'];
-const TABS=[['dash','layout-dashboard','Home'],['leads','users','Leads'],['find','search','Find'],['runs','history','Runs'],['send','send','Send'],['set','settings','Settings']];let tab='dash',timer,skipped=new Set();
+const TABS=[['dash','layout-dashboard','Home'],['leads','users','Leads'],['find','search','Find'],['runs','history','Runs'],['send','send','Send'],['set','settings','Settings']];let tab='dash',timer,JV=-1,JR=false;
+function poller(fn,ms){clearTimeout(timer);const tick=async()=>{if(document.hidden){timer=setTimeout(tick,ms*4);return}let again=false;try{again=await fn()}catch(e){}if(again)timer=setTimeout(tick,ms)};timer=setTimeout(tick,ms)}
 function toast(m,u){const t=$('#toast');window._u=u;t.innerHTML=esc(m)+(u?` <button onclick="_u();toast('Restored')">Undo</button>`:'');t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),u?6000:2200)}
 async function api(p,m='GET',b){const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
- if(r.status==401){$('#login').hidden=false;throw 0}const j=await r.json();if(!r.ok)throw new Error(j.error||'Something went wrong');return j}
+ if(r.status==401){$('#login').hidden=false;throw 0}if(r.status==204)return null;const j=await r.json();if(!r.ok)throw new Error(j.error||'Something went wrong');return j}
 async function login(){try{await api('login','POST',{password:$('#pw').value});$('#login').hidden=true;go('dash')}catch(e){$('#le').textContent=e.message||'Could not sign in'}}
 $('nav').insertAdjacentHTML('beforeend',TABS.map(t=>`<button data-t="${t[0]}" onclick="go('${t[0]}')">${ic(t[1])}<span>${t[2]}</span></button>`).join(''));
 const view=h=>{$('#v').innerHTML=h;draw()};const head=(t,s,a='')=>`<div class="top"><div><h1>${t}</h1><div class="sub">${s}</div></div>${a}</div>`;
-function go(t){tab=t;clearInterval(timer);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));({dash,leads,find,runs,send,set})[t]().catch(e=>e&&toast(e.message))}
+function go(t){tab=t;clearTimeout(timer);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));({dash,leads,find,runs,send,set})[t]().catch(e=>e&&toast(e.message))}
 async function dash(){const s=await api('stats'),p=Math.min(100,s.sent_today/s.limit*100);
  const T=[['users','Total leads',s.total],['phone','With phone',s.with_phone],['send','Ready to message',s.ready],['message-circle','Contacted',s.contacted],['star','Replied or interested',s.warm]];
  view(head('Overview','Your outreach at a glance')+`<div class="glass pad" style="margin-bottom:14px"><div class="top" style="margin:0"><b>Sent today</b><span class="sub">${s.sent_today} of ${s.limit}</span></div><div class="bar"><i style="width:${p}%"></i></div></div>
@@ -111,7 +102,7 @@ const when=t=>t?new Date(t.replace(' ','T')).toLocaleString([],{day:'numeric',mo
 const safe=u=>/^https?:\/\//i.test(u||'')?u:'',hm=t=>t?new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
 dlg2.addEventListener('close',()=>clearInterval(window.rt));
 let FS='scrape',FV={};const keep=()=>{FV={c:$('#fc')?.value,l:$('#fl')?.value,n:$('#fn')?.value,r:$('#fr')?.value}};
-async function find(){const s=await api('settings'),T=[['scrape','Maps scraper'],['osm','OpenStreetMap'],['google','Google API']],
+async function find(){clearTimeout(timer);const s=await api('settings'),T=[['scrape','Maps scraper'],['osm','OpenStreetMap'],['google','Google API']],
  D={scrape:'Free. Opens Google Maps in a hidden browser. Most complete, takes a few minutes.',osm:'Free. Open map data, fast, but many shops have no phone listed.',google:'Official Google Places. Free tier each month, then paid. Needs an API key.'};
  view(head('Find businesses','Pick a source, then search')+`<div class="seg">${T.map(t=>`<button class="${t[0]==FS?'on':''}" onclick="keep();FS='${t[0]}';find()">${t[1]}</button>`).join('')}</div>
  <div class="glass pad"><p class="sub" style="margin:0 0 16px">${D[FS]}</p><div class="field"><label>Business type</label><input id="fc" placeholder="${FS=='osm'?'real estate, pg, gym or shop=bakery':'e.g. real estate'}" value="${esc(FV.c||'')}">
@@ -121,23 +112,23 @@ async function find(){const s=await api('settings'),T=[['scrape','Maps scraper']
  ${FS!='scrape'?`<div class="field"><label>Search radius in km (1 to 50)</label><input id="fr" type="number" inputmode="numeric" min="1" max="50" value="${esc(FV.r||5)}"><div class="chips">${[2,5,10,20].map(n=>`<button onclick="fr.value=${n}">${n} km</button>`).join('')}</div></div>`:''}
  ${FS=='google'?`<div class="field"><label>Google API key</label><input id="fk" type="password" autocomplete="off" placeholder="${s.has_google_key?'Saved. Leave empty to keep it':'Paste your key'}">
  <div class="bar"><i style="width:${Math.min(100,s.google_used/s.google_cap*100)}%"></i></div><p class="sub" style="margin:6px 0 0">${s.google_used} of ${s.google_cap} calls used this month. Search stops at the cap.</p></div>`:''}
- <button class="btn block" onclick="startFind()">${ic('search')}Start search</button></div><div id="jm"></div>`);poll();timer=setInterval(poll,2000)}
+ <button class="btn block" onclick="startFind()">${ic('search')}Start search</button></div><div id="jm"></div>`);JV=-1;poll().then(r=>r&&poller(poll,3000))}
 async function startFind(){const n=parseInt($('#fn').value);if(!(n>=1&&n<=100))return toast('Enter a number from 1 to 100');
- try{await api('find','POST',{source:FS,category:$('#fc').value,location:$('#fl').value,n,radius_km:$('#fr')?.value,api_key:$('#fk')?.value});poll()}catch(e){toast(e.message)}}
-async function poll(){const j=await api('job'),b=$('#jm');if(!b)return;if(j.msg=='idle'){b.innerHTML='';return}const pct=j.total?Math.round(j.done/j.total*100):0;
+ try{await api('find','POST',{source:FS,category:$('#fc').value,location:$('#fl').value,n,radius_km:$('#fr')?.value,api_key:$('#fk')?.value});JV=-1;await poll();poller(poll,3000)}catch(e){toast(e.message)}}
+async function poll(){const b=$('#jm');if(!b)return false;const j=await api('job?v='+JV);if(!j)return JR;JV=j.v;JR=j.running;if(j.msg=='idle'){b.innerHTML='';return false}const pct=j.total?Math.round(j.done/j.total*100):0;
  b.innerHTML=`<div class="glass pad" style="margin-top:14px"><div class="top" style="margin:0 0 12px"><div style="display:flex;gap:10px;align-items:center">${j.running?'<div class="spinner"></div>':ic('check-circle-2')}<b>${esc(j.running?j.phase||'Working':'Finished')}</b></div><span class="sub">${j.running&&j.total?pct+'%':''}</span></div>
  <div class="bar"><i style="width:${j.running?(j.total?pct:6):100}%"></i></div><div class="grid" style="margin:14px 0 0;grid-template-columns:repeat(3,1fr)">${[['Collected',j.collected||0],['Skipped',j.skipped||0],['Checked',(j.done||0)+'/'+(j.total||'-')]].map(x=>`<div><b style="font-size:22px">${x[1]}</b><div class="sub">${x[0]}</div></div>`).join('')}</div>
- <p class="sub" style="margin:12px 0 0">${esc(j.msg)}</p>${j.run_id?`<button class="btn soft sm" style="margin-top:10px" onclick="go('runs')">${ic('history')}View run log</button>`:''}</div>`;draw()}
-async function runs(){clearInterval(timer);const d=await api('runs');
+ <p class="sub" style="margin:12px 0 0">${esc(j.msg)}</p>${j.run_id?`<button class="btn soft sm" style="margin-top:10px" onclick="go('runs')">${ic('history')}View run log</button>`:''}</div>`;draw();return j.running}
+async function runs(auto){if(auto&&tab!='runs')return false;if(!auto)clearTimeout(timer);const d=await api('runs'),live=d.some(r=>r.status=='running');
  view(head('Runs','Every search and what happened')+(d.length?`<div class="glass list">${d.map(r=>`<div class="lead" onclick="openRun(${r.id})"><div class="av">${ic(r.status=='running'?'loader':r.status=='failed'?'alert-circle':'check')}</div><div class="t"><b>${esc(r.query)}${r.location?' in '+esc(r.location):''}</b>
  <small>${esc(when(r.at))} · ${r.fetched} found · ${r.added} new${r.source!='scrape'?' · '+esc(r.source):''}</small></div><span class="score ${r.status=='running'?'hi':''}">${esc(r.status||'done')}</span><span class="chev">${ic('chevron-right')}</span></div>`).join('')}</div>`:`<div class="glass empty">${ic('history')}<div>No runs yet. Start one from Find.</div></div>`));
- if(d.some(r=>r.status=='running'))timer=setInterval(()=>tab=='runs'&&runs(),3000)}
+ if(live&&!auto)poller(()=>runs(true),5000);return live}
 async function openRun(id){const {run:r,events:e}=await api('runs/'+id);
  $('#pdc').innerHTML=`<h1 style="font-size:20px">${esc(r.query)}${r.location?' in '+esc(r.location):''}</h1><div class="sub">${esc(when(r.at))} · ${esc(r.status||'done')}${r.finished_at?' · finished '+esc(when(r.finished_at)):''}</div>
  <div class="grid" style="margin:16px 0;grid-template-columns:repeat(4,1fr)">${[['Asked',r.requested||'-'],['Found',r.fetched],['New',r.added],['Updated',r.changed]].map(x=>`<div><b style="font-size:22px">${x[1]}</b><div class="sub">${x[0]}</div></div>`).join('')}</div>
  ${r.error?`<p class="sub" style="color:var(--tom)">${esc(r.error)}</p>`:''}<label>Events</label><ul class="tl">${e.length?e.slice().reverse().map(x=>`<li><time>${hm(x.at)}</time><span class="${x.kind=='warn'?'w':''}">${esc(x.text)}</span></li>`).join(''):'<li class="sub">No events recorded for this run.</li>'}</ul>
  <button class="btn soft block" style="margin-top:12px" onclick="dlg2.close()">Close</button>`;
- if(!dlg2.open)dlg2.showModal();clearInterval(window.rt);if(r.status=='running')window.rt=setInterval(()=>dlg2.open&&openRun(id),2500)}
+ if(!dlg2.open)dlg2.showModal();clearInterval(window.rt);if(r.status=='running')window.rt=setInterval(()=>dlg2.open&&!document.hidden&&openRun(id),4000)}
 async function openLead(id){const l=await api('leads/'+encodeURIComponent(id)),w=safe(l.website),m=safe(l.maps_url);
  const kv=(i,k,v)=>v?`<div class="kv">${ic(i)}<div><small>${k}</small>${v}</div></div>`:'';
  $('#pdc').innerHTML=`<div style="display:flex;gap:14px;align-items:center"><div class="av" style="width:54px;height:54px;font-size:20px">${esc(l.name[0]||'?').toUpperCase()}</div><div style="min-width:0"><h1 style="font-size:20px">${esc(l.name)}</h1><div class="sub">${esc(l.category)} · score ${l.score}</div></div></div>
@@ -172,5 +163,5 @@ async function set(){const s=await api('settings');view(head('Settings','Message
  <div class="field"><label>Daily limit</label><input id="dl" type="number" min="1" max="100" value="${esc(s.daily_limit)}"></div>
  <div class="tools" style="margin:0"><button class="btn" onclick="saveSet()">Save changes</button><button class="btn soft" onclick="api('logout','POST').then(()=>location.reload())">${ic('log-out')}Log out</button></div></div>`)}
 async function saveSet(){try{await api('settings','PUT',{template:$('#tp').value,daily_limit:$('#dl').value});toast('Saved')}catch(e){toast(e.message)}}
-draw();api('stats').then(()=>go('dash')).catch(()=>{})
+draw();go('dash')
 </script></body></html>
