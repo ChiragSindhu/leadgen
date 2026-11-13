@@ -3,7 +3,17 @@ import os, sys, threading, sqlite3, json, re, time, hashlib, subprocess, tempfil
 from urllib.parse import quote
 import requests, phonenumbers
 
-DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "leads.db")   # same DB for dashboard + bot
+HERE = os.path.dirname(os.path.abspath(__file__))
+def _load_env():   # every entry point (server, bot, scraper) reads .env
+    f = os.path.join(HERE, ".env")
+    if os.path.exists(f):
+        for ln in open(f, encoding="utf-8-sig"):
+            if "=" in ln and not ln.strip().startswith("#"):
+                k, v = ln.split("=", 1); os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
+_load_env()
+DATA_DIR = os.getenv("DATA_DIR") or HERE
+os.makedirs(DATA_DIR, exist_ok=True)
+DB = os.path.join(DATA_DIR, "leads.db")   # one DB shared by server and bot
 LAST_WARNING = None
 REGION = "IN"  # default country for numbers without a +code
 UA = {"User-Agent": "leadpipe/1.1 (personal lead tool)"}

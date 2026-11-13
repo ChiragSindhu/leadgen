@@ -108,7 +108,7 @@ def main():
     seen = {i.get("maps_url") for i in items}
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not a.headful)
+        browser = pw.chromium.launch(headless=not a.headful, args=["--no-sandbox", "--disable-dev-shm-usage"])   # needed in containers
         page = browser.new_context(locale="en-US", viewport={"width": 1280, "height": 900}).new_page()
         try:
             for q in a.query:

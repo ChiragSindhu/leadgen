@@ -6,7 +6,7 @@ import pipeline as P
 
 app = Flask(__name__, static_folder="static")
 app.secret_key = os.getenv("SECRET_KEY") or secrets.token_hex(16)
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE") == "1")
 PW = os.getenv("ADMIN_PASSWORD") or secrets.token_urlsafe(8)
 if not os.getenv("ADMIN_PASSWORD"): print("ADMIN_PASSWORD not set. Temporary password:", PW)
 JOB = {"running": False, "msg": "idle"}

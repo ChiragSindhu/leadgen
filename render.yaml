@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: lead-desk
+    runtime: docker
+    plan: starter          # free tier has no persistent disk and too little RAM for Chromium
+    healthCheckPath: /
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATA_DIR
+        value: /var/data
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: GOOGLE_API_KEY
+        sync: false
