@@ -3,3 +3,4 @@ gunicorn
 requests
 phonenumbers
 playwright
+psycopg2-binary

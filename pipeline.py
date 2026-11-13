@@ -1,7 +1,8 @@
-"""Local lead pipeline v1.1: Google Places (New) + OpenStreetMap + manual/JSON -> SQLite."""
-import os, sys, threading, sqlite3, json, re, time, hashlib, subprocess, tempfile, datetime as dt
+"""Local lead pipeline v1.2: Google Places (New) + OpenStreetMap + manual/JSON -> Supabase Postgres."""
+import os, sys, threading, json, re, time, hashlib, subprocess, tempfile, datetime as dt
 from urllib.parse import quote
 import requests, phonenumbers
+import psycopg2, psycopg2.extras
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 def _load_env():   # every entry point (server, bot, scraper) reads .env
@@ -11,12 +12,10 @@ def _load_env():   # every entry point (server, bot, scraper) reads .env
             if "=" in ln and not ln.strip().startswith("#"):
                 k, v = ln.split("=", 1); os.environ.setdefault(k.strip(), v.strip().strip("\"'"))
 _load_env()
-DATA_DIR = os.getenv("DATA_DIR") or HERE
-os.makedirs(DATA_DIR, exist_ok=True)
-DB = os.path.join(DATA_DIR, "leads.db")   # one DB shared by server and bot
+DATABASE_URL = os.getenv("DATABASE_URL")   # Supabase: Connect -> Direct/Session pooler -> connection string
 LAST_WARNING = None
 REGION = "IN"  # default country for numbers without a +code
-UA = {"User-Agent": "leadpipe/1.1 (personal lead tool)"}
+UA = {"User-Agent": "leadpipe/1.2 (personal lead tool)"}
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 WATCH = ["name", "phone", "website", "email", "address", "status"]   # changes are logged
 COLS = ["id", "source", "name", "category", "address", "lat", "lng", "phone", "is_mobile",
@@ -30,18 +29,25 @@ SAMPLE = {"businesses": [
      "address": "12 MG Road, Bengaluru", "lat": 12.975, "lng": 77.606, "notes": "met at expo"},
     {"name": "Green Nest PG", "category": "pg", "phone": "09845098450", "address": "Indiranagar"}]}
 
+# RLS is enabled with no policies: the public API (publishable key) can't read leads.
+# This app connects with the Postgres connection string, which bypasses RLS.
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS leads(id TEXT PRIMARY KEY, source TEXT, name TEXT, category TEXT, address TEXT,
-  lat REAL, lng REAL, phone TEXT, is_mobile INT, website TEXT, email TEXT, maps_url TEXT, rating REAL,
-  reviews INT, status TEXT, score INT, hash TEXT, first_seen TEXT, last_seen TEXT,
+  lat DOUBLE PRECISION, lng DOUBLE PRECISION, phone TEXT, is_mobile INT, website TEXT, email TEXT, maps_url TEXT,
+  rating DOUBLE PRECISION, reviews INT, status TEXT, score INT, hash TEXT, first_seen TEXT, last_seen TEXT,
   outreach TEXT DEFAULT 'new', notes TEXT DEFAULT '', dup_of TEXT, contacted_at TEXT);
-CREATE TABLE IF NOT EXISTS changes(id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id TEXT, at TEXT,
+CREATE TABLE IF NOT EXISTS changes(id BIGSERIAL PRIMARY KEY, lead_id TEXT, at TEXT,
   field TEXT, old TEXT, new TEXT);
-CREATE TABLE IF NOT EXISTS runs(id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, query TEXT, source TEXT,
+CREATE TABLE IF NOT EXISTS runs(id BIGSERIAL PRIMARY KEY, at TEXT, query TEXT, source TEXT,
   fetched INT, added INT, changed INT, calls INT DEFAULT 0);
 CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT);
-CREATE TABLE IF NOT EXISTS run_events(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id INT, at TEXT, kind TEXT, text TEXT);
+CREATE TABLE IF NOT EXISTS run_events(id BIGSERIAL PRIMARY KEY, run_id BIGINT, at TEXT, kind TEXT, text TEXT);
 CREATE INDEX IF NOT EXISTS idx_phone ON leads(phone);
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE changes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kv ENABLE ROW LEVEL SECURITY;
+ALTER TABLE run_events ENABLE ROW LEVEL SECURITY;
 """
 
 def now(): return dt.datetime.now().isoformat(timespec="seconds")
@@ -51,15 +57,35 @@ MIGRATIONS = [("leads", "dup_of", "TEXT"), ("leads", "contacted_at", "TEXT"), ("
               ("runs", "location", "TEXT"), ("runs", "status", "TEXT DEFAULT 'done'"), ("runs", "finished_at", "TEXT"),
               ("runs", "requested", "INT"), ("runs", "error", "TEXT")]
 
+_NAMED = re.compile(r"(?<![:\w]):([A-Za-z_]\w*)")
+
+class Conn:
+    """Thin wrapper so the rest of the code keeps sqlite-style `?` / `:name` placeholders."""
+    def __init__(self, raw): self.raw = raw
+    def execute(self, sql, params=None):
+        cur = self.raw.cursor()
+        try:
+            if params is None: cur.execute(sql)
+            else:
+                sql = _NAMED.sub(r"%(\1)s", sql) if isinstance(params, dict) else sql.replace("?", "%s")
+                cur.execute(sql, params)
+        except Exception:
+            self.raw.rollback(); raise      # a failed statement must not poison the transaction
+        return cur
+    def commit(self): self.raw.commit()
+    def rollback(self): self.raw.rollback()
+    def close(self): self.raw.close()
+
 def db():
-    c = sqlite3.connect(DB, check_same_thread=False, timeout=30); c.row_factory = sqlite3.Row
-    if DB not in _READY:            # schema + migrations run once per process, not on every request
-        c.execute("PRAGMA journal_mode=WAL")
-        c.executescript(SCHEMA)
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL missing. Add your Supabase Postgres connection string to .env")
+    url = DATABASE_URL if "sslmode=" in DATABASE_URL else DATABASE_URL + ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
+    c = Conn(psycopg2.connect(url, cursor_factory=psycopg2.extras.DictCursor, connect_timeout=15))
+    if DATABASE_URL not in _READY:      # schema + migrations run once per process
+        c.execute(SCHEMA)
         for t, col, typ in MIGRATIONS:
-            if col not in [r[1] for r in c.execute(f"PRAGMA table_info({t})")]:
-                c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {typ}")
-        c.commit(); _READY.add(DB)
+            c.execute(f"ALTER TABLE {t} ADD COLUMN IF NOT EXISTS {col} {typ}")
+        c.commit(); _READY.add(DATABASE_URL)
     return c
 
 def norm_phone(raw, region=None):
@@ -189,8 +215,8 @@ def google_used(c):
 def run(query, lat, lng, radius_m, source="google", key=None, cap=900, max_pages=3, location=None, limit=None, on_progress=None):
     """Google Places API / OpenStreetMap run, logged like the scraper (runs + run_events)."""
     c = db(); counter = [0]; rows = []; err = None
-    run_id = c.execute("INSERT INTO runs(at,query,source,fetched,added,changed,calls,location,status,requested) VALUES(?,?,?,0,0,0,0,?,?,?)",
-                       (now(), query, source, location, "running", limit)).lastrowid; c.commit()
+    run_id = c.execute("INSERT INTO runs(at,query,source,fetched,added,changed,calls,location,status,requested) VALUES(?,?,?,0,0,0,0,?,?,?) RETURNING id",
+                       (now(), query, source, location, "running", limit)).fetchone()[0]; c.commit()
     prog = dict(run_id=run_id, total=0, done=0, collected=0, skipped=0, phase="Fetching from " + source)
     def ev(kind, text):
         c.execute("INSERT INTO run_events(run_id,at,kind,text) VALUES(?,?,?,?)", (run_id, now(), kind, text)); c.commit()
@@ -283,8 +309,8 @@ def run_scrape(query, location, limit=30, timeout=None, on_progress=None):
     here = os.path.dirname(os.path.abspath(__file__))
     tmp = os.path.join(tempfile.gettempdir(), f"scrape_{int(time.time()*1000)}.json")
     c = db()
-    run_id = c.execute("INSERT INTO runs(at,query,source,fetched,added,changed,calls,location,status,requested) VALUES(?,?,?,0,0,0,0,?,?,?)",
-                       (now(), query, "scrape", location, "running", limit)).lastrowid; c.commit()
+    run_id = c.execute("INSERT INTO runs(at,query,source,fetched,added,changed,calls,location,status,requested) VALUES(?,?,?,0,0,0,0,?,?,?) RETURNING id",
+                       (now(), query, "scrape", location, "running", limit)).fetchone()[0]; c.commit()
     prog = dict(run_id=run_id, total=0, done=0, collected=0, skipped=0, phase="Opening Google Maps")
     def ev(kind, text):
         c.execute("INSERT INTO run_events(run_id,at,kind,text) VALUES(?,?,?,?)", (run_id, now(), kind, text)); c.commit()
