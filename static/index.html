@@ -30,6 +30,7 @@ main{margin-left:248px;padding:28px 28px 40px;max-width:1000px}
 .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}h1{font-size:26px;letter-spacing:-.02em;margin:0;font-weight:700}.sub{color:var(--mut);font-size:14px}
 .btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 16px;border-radius:12px;font-weight:600;font-size:14px;background:var(--tom);color:#fff;transition:.15s;text-align:center}
 .btn:active{transform:scale(.97)}.btn.sage{background:var(--sd)}.btn.soft{background:var(--sl);color:var(--sd)}.btn.ghost{background:transparent;color:var(--mut);height:36px;font-weight:500}.btn.sm{height:34px;padding:0 12px;font-size:13px}.btn.block{width:100%}
+.btn[disabled]{opacity:.5;pointer-events:none}
 input,select,textarea{font:inherit;color:var(--ink);width:100%;padding:11px 13px;border-radius:12px;border:1px solid rgba(63,77,55,.14);background:rgba(255,255,255,.75);outline:none;transition:.15s}
 input:focus,select:focus,textarea:focus{border-color:var(--sage);box-shadow:0 0 0 4px rgba(125,143,110,.18)}label{font-size:13px;font-weight:600;color:var(--sd);display:block;margin:0 0 6px}
 .field{margin-bottom:14px}.pad{padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:14px}
@@ -50,6 +51,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--sage);box-shadow:0 0 
 .spinner{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--sl);border-top-color:var(--sd);animation:sp .8s linear infinite;flex:none}@keyframes sp{to{transform:rotate(360deg)}}
 #toast{position:fixed;left:50%;bottom:96px;transform:translate(-50%,20px);background:var(--sd);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:60}#toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}#toast button{all:unset;cursor:pointer;color:#ff9b8a;font-weight:700;margin-left:12px}
 dialog{border:0;padding:0;background:transparent;max-width:520px;width:calc(100% - 24px);margin:auto}dialog::backdrop{background:rgba(35,42,31,.35);backdrop-filter:blur(6px)}dialog .glass{background:rgba(250,249,244,.92);padding:20px}
+dialog.wide{max-width:640px}
 #login{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg)}#login .glass{width:min(360px,90%);padding:26px}
 .mbar{display:none}
 @media(max-width:800px){
@@ -72,107 +74,381 @@ dialog{border:0;padding:0;background:transparent;max-width:520px;width:calc(100%
 .stp .n{width:30px;height:30px;border-radius:50%;background:var(--sl);color:var(--sd);display:grid;place-items:center;margin:0 auto 6px;font-weight:700;font-size:13px}
 .stp.on{color:var(--ink);font-weight:600}.stp.on .n{background:var(--sd);color:#fff}.stp.ok .n{background:var(--sage);color:#fff}
 .big{height:52px;font-size:16px;border-radius:14px}.hint{text-align:center;color:var(--mut);font-size:13px;margin:10px 0 0}
-.alt{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}</style></head><body>
+.alt{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+
+/* ---------- performance / polish additions ---------- */
+.pg{animation:pgin .2s ease-out}
+@keyframes pgin{from{opacity:0;transform:translateY(6px)}}
+.sk{display:inline-block;vertical-align:middle;position:relative;overflow:hidden;border-radius:8px;background:rgba(63,77,55,.09);color:transparent!important;pointer-events:none;user-select:none}
+.sk::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);animation:shim 1.25s ease-in-out infinite}
+@keyframes shim{to{transform:translateX(100%)}}
+.skrow{display:flex;align-items:center;gap:12px;padding:12px}.skrow+.skrow{border-top:1px solid rgba(63,77,55,.07)}
+.busy{opacity:.55;transition:opacity .15s}
+dialog[open]{animation:dlgin .24s cubic-bezier(.2,.8,.2,1)}
+dialog[open]::backdrop{animation:bdin .24s ease-out}
+dialog.out{animation:dlgout .17s ease-in forwards}
+dialog.out::backdrop{animation:bdout .17s ease-in forwards}
+@keyframes dlgin{from{opacity:0;transform:translateY(14px) scale(.97)}}
+@keyframes dlgout{to{opacity:0;transform:translateY(10px) scale(.98)}}
+@keyframes bdin{from{opacity:0}}@keyframes bdout{to{opacity:0}}
+@keyframes sheetin{from{transform:translateY(100%)}}@keyframes sheetout{to{transform:translateY(100%)}}
+.grab{display:none;width:40px;height:4px;border-radius:9px;background:rgba(63,77,55,.22);margin:-8px auto 14px}
+@media(max-width:800px){dialog[open]{animation-name:sheetin;animation-duration:.3s}dialog.out{animation-name:sheetout}.grab{display:block}}
+@media(prefers-reduced-motion:reduce){.sk::after{animation:none}.pg,dialog[open],dialog[open]::backdrop,dialog.out,dialog.out::backdrop{animation-duration:.01s}}
+.brow{background:rgba(255,255,255,.6);border:1px solid rgba(63,77,55,.1);border-radius:16px;padding:14px;margin-bottom:10px}
+.brow .bh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:520px){.r2{grid-template-columns:1fr}}
+.pv{border:1px solid rgba(63,77,55,.1);border-radius:16px;background:rgba(255,255,255,.5);margin-top:14px;overflow:hidden}
+.pv .ph{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--sd);border-bottom:1px solid rgba(63,77,55,.08)}
+.pv .pl{max-height:190px;overflow:auto;overscroll-behavior:contain}
+.pr{display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:13px}.pr+.pr{border-top:1px solid rgba(63,77,55,.07)}
+.pr .t{flex:1;min-width:0}.pr b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}.pr small{display:block;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
+.tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--sl);color:var(--sd);white-space:nowrap}.tag.w{background:#fbe6cf;color:#9a5b12}.tag.e{background:#fbdcd6;color:#b23a26}
+.err{background:#fbdcd6;color:#8f2d1c;padding:10px 12px;border-radius:12px;font-size:13px;margin-top:12px}
+.ck{display:flex;gap:8px;align-items:center;font-weight:500;margin:12px 0 0;cursor:pointer}.ck input{width:auto;margin:0}
+.wl{text-align:left;font-size:13px;color:#9a5b12;background:#fbe6cf;border-radius:12px;padding:10px 12px;margin-top:12px}
+</style></head><body>
 <div id="login" hidden><div class="glass"><div class="brand" style="margin:0 0 20px"><span class="logo"><i data-lucide="map-pin"></i></span>Vansh Lead</div>
 <div class="field"><label>Admin password</label><input id="pw" type="password" autocomplete="current-password" onkeydown="event.key=='Enter'&&login()"></div>
 <p id="le" class="sub" style="color:var(--tom);margin:-6px 0 12px"></p><button class="btn block" onclick="login()">Sign in</button></div></div>
-<nav class="glass"><div class="brand"><span class="logo"><i data-lucide="map-pin"></i></span>Vansh Lead</div></nav><main id="v"></main><div id="toast"></div>
-<dialog id="dlg"><div class="glass"><h1 style="font-size:20px">Add businesses</h1><p class="sub">One per line as <b>Name, phone, type</b>, or paste JSON.</p>
-<textarea id="addt" rows="6" placeholder="Ravi Realty, 98450 12345, real estate"></textarea>
-<div class="tools" style="margin:14px 0 0;justify-content:flex-end"><button class="btn soft" onclick="dlg.close()">Cancel</button><button class="btn" onclick="addNow()">Add</button></div></div></dialog>
+<nav class="glass"><div class="brand"><span class="logo"><i data-lucide="map-pin"></i></span>Vansh Lead</div></nav>
+<main id="v"><section class="pg" id="p-dash" hidden></section><section class="pg" id="p-leads" hidden></section><section class="pg" id="p-find" hidden></section><section class="pg" id="p-runs" hidden></section><section class="pg" id="p-send" hidden></section><section class="pg" id="p-set" hidden></section></main><div id="toast"></div>
+<datalist id="cats"><option value="real estate"><option value="pg"><option value="gym"><option value="clinic"><option value="salon"><option value="restaurant"><option value="school"><option value="shop"></datalist>
+<dialog id="dlg" class="wide"><div class="glass sheet" id="adc"></div></dialog>
 <dialog id="dlg2"><div class="glass sheet" id="pdc"></div></dialog>
 <script>
+/* ============ helpers ============ */
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const ic=n=>`<i data-lucide="${n}"></i>`,draw=()=>lucide.createIcons(),ST=['new','messaged','replied','interested','not_interested','bad_number','do_not_contact'];
-const TABS=[['dash','layout-dashboard','Home'],['leads','users','Leads'],['find','search','Find'],['runs','history','Runs'],['send','send','Send'],['set','settings','Settings']];let tab='dash',timer,JV=-1,JR=false;
-function poller(fn,ms){clearTimeout(timer);const tick=async()=>{if(document.hidden){timer=setTimeout(tick,ms*4);return}let again=false;try{again=await fn()}catch(e){}if(again)timer=setTimeout(tick,ms)};timer=setTimeout(tick,ms)}
-function toast(m,u){const t=$('#toast');window._u=u;t.innerHTML=esc(m)+(u?` <button onclick="_u();toast('Restored')">Undo</button>`:'');t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),u?6000:2200)}
-async function api(p,m='GET',b){const r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
- if(r.status==401){$('#login').hidden=false;throw 0}if(r.status==204)return null;const j=await r.json();if(!r.ok)throw new Error(j.error||'Something went wrong');return j}
-async function login(){try{await api('login','POST',{password:$('#pw').value});$('#login').hidden=true;go('dash')}catch(e){$('#le').textContent=e.message||'Could not sign in'}}
-$('nav').insertAdjacentHTML('beforeend',TABS.map(t=>`<button data-t="${t[0]}" onclick="go('${t[0]}')">${ic(t[1])}<span>${t[2]}</span></button>`).join(''));
-const view=h=>{$('#v').innerHTML=h;draw()};const head=(t,s,a='')=>`<div class="top"><div><h1>${t}</h1><div class="sub">${s}</div></div>${a}</div>`;
-function go(t){tab=t;clearTimeout(timer);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==t));({dash,leads,find,runs,send,set})[t]().catch(e=>e&&toast(e.message))}
-async function dash(){const s=await api('stats'),p=Math.min(100,s.sent_today/s.limit*100);
- const T=[['users','Total leads',s.total],['phone','With phone',s.with_phone],['send','Ready to message',s.ready],['message-circle','Contacted',s.contacted],['star','Replied or interested',s.warm]];
- view(head('Overview','Your outreach at a glance')+`<div class="glass pad" style="margin-bottom:14px"><div class="top" style="margin:0"><b>Sent today</b><span class="sub">${s.sent_today} of ${s.limit}</span></div><div class="bar"><i style="width:${p}%"></i></div></div>
- <div class="grid">${T.map(x=>`<div class="glass stat"><div class="ico">${ic(x[0])}</div><b>${x[2]}</b><span>${x[1]}</span></div>`).join('')}</div>
- <div class="tools"><button class="btn" onclick="go('send')">${ic('send')}Start sending</button><button class="btn soft" onclick="go('find')">${ic('search')}Find businesses</button></div>`)}
-async function leads(){const q=$('#q')?.value||'',st=$('#st')?.value||'',m=$('#mo')?.dataset.on=='1'?1:0;const d=await api(`leads?q=${encodeURIComponent(q)}&status=${st}&mobile=${m}`);
- if(!$('#q'))view(head('Leads',`Everything you have collected`,`<button class="btn" onclick="dlg.showModal()">${ic('plus')}Add</button>`)+`<div class="tools"><div class="grow">${ic('search')}<input id="q" placeholder="Search name, phone or area" oninput="clearTimeout(window.t);window.t=setTimeout(leads,300)"></div>
- <select id="st" class="chip" style="height:42px" onchange="leads()"><option value="">All statuses</option>${ST.map(s=>`<option>${s}</option>`).join('')}</select>
- <button id="mo" class="btn soft" data-on="0" onclick="this.dataset.on=this.dataset.on=='1'?0:1;this.className='btn '+(this.dataset.on=='1'?'sage':'soft');leads()">${ic('smartphone')}Mobile only</button></div><div id="ll" class="glass list"></div>`);
- $('#ll').innerHTML=d.length?d.map(l=>`<div class="lead" onclick="openLead('${esc(l.id)}')"><div class="av">${esc(l.name[0]||'?').toUpperCase()}</div><div class="t"><b>${esc(l.name)}</b><small>${esc(l.category)} · ${esc(l.phone||'No phone')} · ${esc(l.outreach)}</small></div>
- <span class="score ${l.score>=70?'hi':''}">${l.score}</span><select class="chip rowact" onclick="event.stopPropagation()" onchange="upd('${esc(l.id)}',this.value)">${ST.map(s=>`<option ${s==l.outreach?'selected':''}>${s}</option>`).join('')}</select>
- <button class="btn ghost sm rowact" aria-label="Delete" onclick="event.stopPropagation();del('${esc(l.id)}')">${ic('trash-2')}</button><span class="chev">${ic('chevron-right')}</span></div>`).join(''):`<div class="empty">${ic('inbox')}<div>No leads match yet</div></div>`;draw()}
-async function upd(id,o){await api('leads/'+encodeURIComponent(id),'PATCH',{outreach:o});toast('Status updated')}
-async function del(id){if(confirm('Delete this lead?')){await api('leads/'+encodeURIComponent(id),'DELETE');toast('Deleted');leads()}}
-async function addNow(){const t=$('#addt').value.trim();let b;try{b=JSON.parse(t)}catch{b=t.split('\n').map(l=>l.split(/[,|]/).map(x=>x.trim())).filter(p=>p.length>1).map(p=>({name:p[0],phone:p[1],category:p[2]}))}
- try{const r=await api('leads','POST',b);toast(`Added ${r.added}, updated ${r.updated}`+(r.warnings.length?`, ${r.warnings.length} warning(s)`:''));if(r.added||r.updated){$('#addt').value='';dlg.close();tab=='leads'&&leads()}}catch(e){toast(e.message)}}
-const when=t=>t?new Date(t.replace(' ','T')).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+const ic=n=>`<i data-lucide="${n}"></i>`,draw=()=>{try{lucide.createIcons()}catch(e){}},enc=encodeURIComponent,
+ST=['new','messaged','replied','interested','not_interested','bad_number','do_not_contact'],GRAB='<div class="grab"></div>',D1=$('#dlg'),D2=$('#dlg2');
+const TABS=[['dash','layout-dashboard','Home'],['leads','users','Leads'],['find','search','Find'],['runs','history','Runs'],['send','send','Send'],['set','settings','Settings']];
+const sk=(w,h,x='')=>`<span class="sk" style="width:${w};height:${h};${x}"></span>`;
+const skRows=n=>Array.from({length:n},(_,i)=>`<div class="skrow">${sk('42px','42px','border-radius:14px')}<div style="flex:1">${sk([62,48,70,55,66,44,58][i%7]+'%','14px','display:block;margin-bottom:6px')}${sk('38%','11px','display:block')}</div>${sk('34px','20px')}</div>`).join('');
+const head=(t,s,a='')=>`<div class="top"><div><h1>${t}</h1><div class="sub">${s}</div></div>${a}</div>`;
+function paint(el,h,nd){if(!el||el._h===h)return;el._h=h;el.innerHTML=h;if(!nd)draw()}
+function setv(id,v){const e=$('#'+id);if(!e)return;e.classList.remove('sk');e.removeAttribute('style');e.textContent=v}
+const initial=n=>esc(((n||'')[0]||'?').toUpperCase());
+function toast(m,u){const t=$('#toast');window._u=u;t.innerHTML=esc(m)+(u?' <button data-a="undo">Undo</button>':'');t.classList.add('on');clearTimeout(t.h);t.h=setTimeout(()=>t.classList.remove('on'),u?6000:2200)}
+
+/* ============ network + cache ============ */
+let tab='',PT=0,PA=null,PK=0,DS=0,RT=0,LV=0;
+const C=new Map(),INF=new Map(),SC={},INIT={};
+async function api(p,m='GET',b,o={}){
+ let r;try{r=await fetch('/api/'+p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined,signal:o.signal})}
+ catch(e){if(e&&e.name=='AbortError')throw 0;throw new Error('Network error. Check your connection.')}
+ if(r.status==401){$('#login').hidden=false;stopPoll();throw 0}if(r.status==204)return null;
+ let j=null;try{j=await r.json()}catch(e){}
+ if(!r.ok)throw new Error((j&&j.error)||'Something went wrong');return j}
+function fetchC(p,o={}){
+ const run=async()=>{const d=await api(p,'GET',null,{signal:o.signal}),s=JSON.stringify(d),c=C.get(p),changed=!c||c.s!==s;C.set(p,{d,s,t:Date.now(),x:false});if(p.startsWith('leads?')){LV++;pruneLeads()}return{d,changed}};
+ if(o.signal)return run();
+ if(INF.has(p))return INF.get(p);
+ const pr=run().finally(()=>INF.delete(p));INF.set(p,pr);return pr}
+async function swr(p,o){
+ const c=C.get(p);let shown=false;
+ if(c){o.render(c.d,true);shown=true;if(!c.x&&Date.now()-c.t<(o.ttl??20000))return c.d}
+ const r=await fetchC(p,{signal:o.signal});
+ if(o.ok&&!o.ok())return r.d;
+ if(!shown||r.changed)o.render(r.d,false);return r.d}
+function put(p,d){const c=C.get(p);C.set(p,{d,s:JSON.stringify(d),t:c?c.t:Date.now(),x:c?c.x:false});if(p.startsWith('leads?'))LV++}
+const stale=re=>{for(const[k,c]of C)if(re.test(k))c.x=true};
+const afterMut=()=>stale(/^(stats|queue|leads)/),afterJob=()=>stale(/^(stats|queue|leads|runs|settings)/);
+function pruneLeads(){const ks=[...C].filter(([k])=>k.startsWith('leads?')).sort((a,b)=>a[1].t-b[1].t);while(ks.length>12)C.delete(ks.shift()[0])}
+function patchLeadCaches(id,patch){id=String(id);for(const[k,c]of C){if(k.startsWith('leads?')&&Array.isArray(c.d)){let hit=0;const d=c.d.map(l=>String(l.id)==id?(hit=1,Object.assign({},l,patch)):l);if(hit)put(k,d)}else if(k=='leads/'+enc(id)&&c.d)put(k,Object.assign({},c.d,patch))}}
+function dropLead(id){id=String(id);const snap=[];for(const[k,c]of C)if(k.startsWith('leads?')&&Array.isArray(c.d)&&c.d.some(l=>String(l.id)==id)){snap.push([k,c.d]);put(k,c.d.filter(l=>String(l.id)!=id))}return snap}
+function findLead(id){id=String(id);for(const[k,c]of C)if(k.startsWith('leads?')&&Array.isArray(c.d)){const l=c.d.find(x=>String(x.id)==id);if(l)return l}return null}
+
+/* ============ polling (single, abortable) ============ */
+function stopPoll(){clearTimeout(PT);if(PA)PA.abort();PA=null;PK++}
+function poller(fn,ms,now){stopPoll();const k=PK,ac=PA=new AbortController();
+ const tick=async()=>{if(k!==PK)return;if(document.hidden){PT=setTimeout(tick,ms*4);return}let again=false;try{again=await fn(ac.signal)}catch(e){}if(k===PK&&again)PT=setTimeout(tick,ms)};
+ PT=setTimeout(tick,now?0:ms)}
+
+/* ============ auth ============ */
+async function login(){try{await api('login','POST',{password:$('#pw').value});$('#login').hidden=true;C.clear();go('dash')}catch(e){$('#le').textContent=(e&&e.message)||'Could not sign in'}}
+
+/* ============ navigation ============ */
+$('nav').insertAdjacentHTML('beforeend',TABS.map(t=>`<button data-t="${t[0]}" data-a="go" data-v="${t[0]}">${ic(t[1])}<span>${t[2]}</span></button>`).join(''));
+const NB=[...document.querySelectorAll('nav button')],PG=[...document.querySelectorAll('.pg')];
+function go(t){if(tab)SC[tab]=scrollY;tab=t;stopPoll();
+ NB.forEach(b=>b.classList.toggle('on',b.dataset.t==t));PG.forEach(p=>p.hidden=p.id!='p-'+t);
+ if(!INIT[t]){INIT[t]=1;SH[t]()}scrollTo(0,SC[t]||0);
+ LDR[t]().catch(e=>e&&toast(e.message))}
+const PP={dash:()=>'stats',leads:()=>lk(),runs:()=>'runs',send:()=>'queue',set:()=>'settings',find:()=>'settings'};
+function prefetch(t){const p=PP[t]();const c=C.get(p);if(c&&!c.x&&Date.now()-c.t<15000)return;fetchC(p).catch(()=>{})}
+$('nav').addEventListener('pointerover',e=>{const b=e.target.closest('button[data-t]');if(b&&b.dataset.t!=tab)prefetch(b.dataset.t)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&INIT[tab])LDR[tab]().catch(()=>{})});
+
+/* ============ dialogs ============ */
+function openDlg(d){if(!d.open)d.showModal()}
+function closeDlg(d){if(!d||!d.open||d.classList.contains('out'))return;DS++;clearTimeout(RT);d.classList.add('out');setTimeout(()=>{d.classList.remove('out');d.close()},170)}
+[D1,D2].forEach(d=>{let dn=false;d.addEventListener('pointerdown',e=>{dn=e.target===d});d.addEventListener('click',e=>{if(dn&&e.target===d)closeDlg(d);dn=false});d.addEventListener('cancel',e=>{e.preventDefault();closeDlg(d)})});
+function showSheet(h,keep){const s=$('#pdc'),y=s.scrollTop;s.innerHTML=h;draw();s.scrollTop=keep?y:0}
+const errSheet=m=>GRAB+`<div class="empty">${ic('alert-circle')}<div>${esc(m||'Something went wrong')}</div></div><button class="btn soft block" data-a="close">Close</button>`;
+
+/* ============ HOME ============ */
+const DT=[['users','Total leads','total'],['phone','With phone','with_phone'],['send','Ready to message','ready'],['message-circle','Contacted','contacted'],['star','Replied or interested','warm']];
+function shDash(){$('#p-dash').innerHTML=head('Overview','Your outreach at a glance')+`<div class="glass pad" style="margin-bottom:14px"><div class="top" style="margin:0"><b>Sent today</b><span class="sub" id="d-st">${sk('70px','14px')}</span></div><div class="bar"><i id="d-bar" style="width:0"></i></div></div>
+ <div class="grid">${DT.map((x,i)=>`<div class="glass stat"><div class="ico">${ic(x[0])}</div><b id="d${i}" class="sk" style="width:56px;height:30px;margin-bottom:4px"></b><span>${x[1]}</span></div>`).join('')}</div>
+ <div class="tools"><button class="btn" data-a="go" data-v="send">${ic('send')}Start sending</button><button class="btn soft" data-a="go" data-v="find">${ic('search')}Find businesses</button></div>`;draw()}
+function fillDash(s){DT.forEach((t,i)=>setv('d'+i,s[t[2]]));setv('d-st',`${s.sent_today} of ${s.limit}`);$('#d-bar').style.width=(s.limit?Math.min(100,s.sent_today/s.limit*100):0)+'%'}
+const loadDash=()=>swr('stats',{ttl:20000,render:fillDash});
+
+/* ============ LEADS ============ */
+const LF={q:'',st:'',m:0};let LS=0,LC=null,QT=0;
+const lk=(q=LF.q)=>`leads?q=${enc(q)}&status=${LF.st}&mobile=${LF.m}`;
+function shLeads(){$('#p-leads').innerHTML=head('Leads','Everything you have collected',`<button class="btn" data-a="add">${ic('plus')}Add</button>`)+
+ `<div class="tools"><div class="grow">${ic('search')}<input id="q" placeholder="Search name, phone or area" autocomplete="off"></div>
+ <select id="st" class="chip" style="height:42px"><option value="">All statuses</option>${ST.map(s=>`<option>${s}</option>`).join('')}</select>
+ <button id="mo" class="btn soft" data-a="mob">${ic('smartphone')}Mobile only</button></div><div id="lk" class="glass list">${skRows(7)}</div><div id="ll" class="glass list" hidden></div>`;draw();
+ $('#q').addEventListener('input',()=>{clearTimeout(QT);QT=setTimeout(()=>{const v=$('#q').value.trim();if(v==LF.q)return;LF.q=v;loadLeads()},250)});
+ $('#st').addEventListener('change',e=>{LF.st=e.target.value;loadLeads()})}
+const rowSig=l=>[l.id,l.name,l.category,l.phone,l.outreach,l.score].join('|');
+const rowHTML=l=>{const id=esc(l.id);return `<div class="av">${initial(l.name)}</div><div class="t"><b>${esc(l.name)}</b><small>${esc(l.category)} · ${esc(l.phone||'No phone')} · ${esc(l.outreach)}</small></div>
+ <span class="score ${l.score>=70?'hi':''}">${esc(l.score)}</span><select class="chip rowact" data-a="st" data-id="${id}">${ST.map(s=>`<option ${s==l.outreach?'selected':''}>${s}</option>`).join('')}</select>
+ <button class="btn ghost sm rowact" aria-label="Delete" data-a="del" data-id="${id}">${ic('trash-2')}</button><span class="chev">${ic('chevron-right')}</span>`};
+function renderLeads(d){const ll=$('#ll'),lkx=$('#lk'),M=ll._m||(ll._m=new Map());ll.classList.remove('busy');
+ if(!d.length){M.clear();ll.textContent='';ll.hidden=true;lkx.hidden=false;lkx.innerHTML=`<div class="empty">${ic('inbox')}<div>No leads match yet</div></div>`;draw();return}
+ lkx.hidden=true;ll.hidden=false;const seen=new Set();
+ d.forEach((l,i)=>{const k=String(l.id),sig=rowSig(l);let r=M.get(k);
+  if(!r){const el=document.createElement('div');el.className='lead';el.dataset.a='open';el.dataset.id=k;r={el,sig:null};M.set(k,r)}
+  if(r.sig!==sig){r.el.innerHTML=rowHTML(l);r.sig=sig}
+  seen.add(k);const cur=ll.children[i];if(cur!==r.el)ll.insertBefore(r.el,cur||null)});
+ for(const[k,r]of M)if(!seen.has(k)){r.el.remove();M.delete(k)}
+ draw()}
+function provisional(){if(!LF.q)return null;const b=C.get(lk(''));if(!b||!Array.isArray(b.d))return null;const q=LF.q.toLowerCase();
+ const r=b.d.filter(l=>[l.name,l.phone,l.category,l.address].join(' ').toLowerCase().includes(q));return r.length?r:null}
+function loadLeads(){
+ const key=lk(),my=++LS;if(LC)LC.abort();LC=new AbortController();const ll=$('#ll');
+ if(!C.has(key)){const pv=provisional();
+  if(pv){renderLeads(pv);ll.classList.add('busy')}
+  else if(ll._m&&ll._m.size)ll.classList.add('busy')
+  else{ll.hidden=true;$('#lk').hidden=false;$('#lk').innerHTML=skRows(7)}}
+ return swr(key,{ttl:15000,signal:LC.signal,ok:()=>my===LS,render:d=>{if(my===LS)renderLeads(d)}}).catch(e=>{
+  if(e&&my===LS){ll.classList.remove('busy');toast(e.message);if(!ll._m||!ll._m.size){ll.hidden=true;$('#lk').hidden=false;$('#lk').innerHTML=`<div class="empty">${ic('alert-circle')}<div>Couldn't load leads</div><button class="btn soft sm" style="margin-top:12px" data-a="reload">Try again</button></div>`;draw()}}})}
+async function upd(id,o){patchLeadCaches(id,{outreach:o});const c=C.get(lk());c&&renderLeads(c.d);
+ try{await api('leads/'+enc(id),'PATCH',{outreach:o});afterMut();toast('Status updated')}catch(e){e&&toast(e.message);loadLeads()}}
+async function del(id){if(!confirm('Delete this lead?'))return;const snap=dropLead(id);const c=C.get(lk());c&&renderLeads(c.d);
+ try{await api('leads/'+enc(id),'DELETE');afterMut();C.delete('leads/'+enc(id));toast('Deleted')}catch(e){snap.forEach(([k,d])=>put(k,d));const c2=C.get(lk());c2&&renderLeads(c2.d);e&&toast(e.message)}}
+
+/* ----- lead detail ----- */
+const when=t=>t?new Date(String(t).replace(' ','T')).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
 const safe=u=>/^https?:\/\//i.test(u||'')?u:'',hm=t=>t?new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'';
-dlg2.addEventListener('close',()=>clearInterval(window.rt));
-let FS='scrape',FV={};const keep=()=>{FV={c:$('#fc')?.value,l:$('#fl')?.value,n:$('#fn')?.value,r:$('#fr')?.value}};
-async function find(){clearTimeout(timer);const s=await api('settings'),T=[['scrape','Maps scraper'],['osm','OpenStreetMap'],['google','Google API']],
- D={scrape:'Free. Opens Google Maps in a hidden browser. Most complete, takes a few minutes.',osm:'Free. Open map data, fast, but many shops have no phone listed.',google:'Official Google Places. Free tier each month, then paid. Needs an API key.'};
- view(head('Find businesses','Pick a source, then search')+`<div class="seg">${T.map(t=>`<button class="${t[0]==FS?'on':''}" onclick="keep();FS='${t[0]}';find()">${t[1]}</button>`).join('')}</div>
- <div class="glass pad"><p class="sub" style="margin:0 0 16px">${D[FS]}</p><div class="field"><label>Business type</label><input id="fc" placeholder="${FS=='osm'?'real estate, pg, gym or shop=bakery':'e.g. real estate'}" value="${esc(FV.c||'')}">
- <div class="chips">${['real estate','pg','gym','clinic','salon'].map(c=>`<button onclick="fc.value='${c}'">${c}</button>`).join('')}</div></div>
- <div class="field"><label>Area and city</label><input id="fl" placeholder="Indiranagar, Bengaluru" value="${esc(FV.l??s.last_location)}"></div>
- <div class="field"><label>How many to keep (1 to 100)</label><input id="fn" type="number" inputmode="numeric" min="1" max="100" value="${esc(FV.n||20)}"><div class="chips">${[10,20,30,50].map(n=>`<button onclick="fn.value=${n}">${n}</button>`).join('')}</div></div>
- ${FS!='scrape'?`<div class="field"><label>Search radius in km (1 to 50)</label><input id="fr" type="number" inputmode="numeric" min="1" max="50" value="${esc(FV.r||5)}"><div class="chips">${[2,5,10,20].map(n=>`<button onclick="fr.value=${n}">${n} km</button>`).join('')}</div></div>`:''}
- ${FS=='google'?`<div class="field"><label>Google API key</label><input id="fk" type="password" autocomplete="off" placeholder="${s.has_google_key?'Saved. Leave empty to keep it':'Paste your key'}">
- <div class="bar"><i style="width:${Math.min(100,s.google_used/s.google_cap*100)}%"></i></div><p class="sub" style="margin:6px 0 0">${s.google_used} of ${s.google_cap} calls used this month. Search stops at the cap.</p></div>`:''}
- <button class="btn block" onclick="startFind()">${ic('search')}Start search</button></div><div id="jm"></div>`);JV=-1;poll().then(r=>r&&poller(poll,3000))}
-async function startFind(){const n=parseInt($('#fn').value);if(!(n>=1&&n<=100))return toast('Enter a number from 1 to 100');
- try{await api('find','POST',{source:FS,category:$('#fc').value,location:$('#fl').value,n,radius_km:$('#fr')?.value,api_key:$('#fk')?.value});JV=-1;await poll();poller(poll,3000)}catch(e){toast(e.message)}}
-async function poll(){const b=$('#jm');if(!b)return false;const j=await api('job?v='+JV);if(!j)return JR;JV=j.v;JR=j.running;if(j.msg=='idle'){b.innerHTML='';return false}const pct=j.total?Math.round(j.done/j.total*100):0;
- b.innerHTML=`<div class="glass pad" style="margin-top:14px"><div class="top" style="margin:0 0 12px"><div style="display:flex;gap:10px;align-items:center">${j.running?'<div class="spinner"></div>':ic('check-circle-2')}<b>${esc(j.running?j.phase||'Working':'Finished')}</b></div><span class="sub">${j.running&&j.total?pct+'%':''}</span></div>
- <div class="bar"><i style="width:${j.running?(j.total?pct:6):100}%"></i></div><div class="grid" style="margin:14px 0 0;grid-template-columns:repeat(3,1fr)">${[['Collected',j.collected||0],['Skipped',j.skipped||0],['Checked',(j.done||0)+'/'+(j.total||'-')]].map(x=>`<div><b style="font-size:22px">${x[1]}</b><div class="sub">${x[0]}</div></div>`).join('')}</div>
- <p class="sub" style="margin:12px 0 0">${esc(j.msg)}</p>${j.run_id?`<button class="btn soft sm" style="margin-top:10px" onclick="go('runs')">${ic('history')}View run log</button>`:''}</div>`;draw();return j.running}
-async function runs(auto){if(auto&&tab!='runs')return false;if(!auto)clearTimeout(timer);const d=await api('runs'),live=d.some(r=>r.status=='running');
- view(head('Runs','Every search and what happened')+(d.length?`<div class="glass list">${d.map(r=>`<div class="lead" onclick="openRun(${r.id})"><div class="av">${ic(r.status=='running'?'loader':r.status=='failed'?'alert-circle':'check')}</div><div class="t"><b>${esc(r.query)}${r.location?' in '+esc(r.location):''}</b>
- <small>${esc(when(r.at))} · ${r.fetched} found · ${r.added} new${r.source!='scrape'?' · '+esc(r.source):''}</small></div><span class="score ${r.status=='running'?'hi':''}">${esc(r.status||'done')}</span><span class="chev">${ic('chevron-right')}</span></div>`).join('')}</div>`:`<div class="glass empty">${ic('history')}<div>No runs yet. Start one from Find.</div></div>`));
- if(live&&!auto)poller(()=>runs(true),5000);return live}
-async function openRun(id){const {run:r,events:e}=await api('runs/'+id);
- $('#pdc').innerHTML=`<h1 style="font-size:20px">${esc(r.query)}${r.location?' in '+esc(r.location):''}</h1><div class="sub">${esc(when(r.at))} · ${esc(r.status||'done')}${r.finished_at?' · finished '+esc(when(r.finished_at)):''}</div>
- <div class="grid" style="margin:16px 0;grid-template-columns:repeat(4,1fr)">${[['Asked',r.requested||'-'],['Found',r.fetched],['New',r.added],['Updated',r.changed]].map(x=>`<div><b style="font-size:22px">${x[1]}</b><div class="sub">${x[0]}</div></div>`).join('')}</div>
- ${r.error?`<p class="sub" style="color:var(--tom)">${esc(r.error)}</p>`:''}<label>Events</label><ul class="tl">${e.length?e.slice().reverse().map(x=>`<li><time>${hm(x.at)}</time><span class="${x.kind=='warn'?'w':''}">${esc(x.text)}</span></li>`).join(''):'<li class="sub">No events recorded for this run.</li>'}</ul>
- <button class="btn soft block" style="margin-top:12px" onclick="dlg2.close()">Close</button>`;
- if(!dlg2.open)dlg2.showModal();clearInterval(window.rt);if(r.status=='running')window.rt=setInterval(()=>dlg2.open&&!document.hidden&&openRun(id),4000)}
-async function openLead(id){const l=await api('leads/'+encodeURIComponent(id)),w=safe(l.website),m=safe(l.maps_url);
+const kvSk=()=>`<div class="kv">${sk('18px','18px')}<div style="flex:1">${sk('30%','10px','display:block;margin-bottom:6px')}${sk('62%','14px','display:block')}</div></div>`;
+function leadSkel(pv){return GRAB+`<div style="display:flex;gap:14px;align-items:center"><div class="av" style="width:54px;height:54px;font-size:20px">${pv?initial(pv.name):sk('54px','54px','border-radius:14px')}</div><div style="min-width:0;flex:1">${pv?`<h1 style="font-size:20px">${esc(pv.name)}</h1><div class="sub">${esc(pv.category)} · score ${esc(pv.score)}</div>`:sk('60%','22px','display:block;margin-bottom:6px')+sk('40%','13px','display:block')}</div></div>
+ <div class="qa">${sk('100%','42px','border-radius:12px')}${sk('100%','42px','border-radius:12px')}${sk('100%','42px','border-radius:12px')}</div>${sk('100%','44px','display:block;margin-bottom:14px;border-radius:12px')}${kvSk()}${kvSk()}${kvSk()}${kvSk()}
+ <div class="tools" style="margin:14px 0 0"><button class="btn" disabled>Save</button><button class="btn soft" data-a="close">Close</button></div>`}
+function openLead(id){const my=++DS;clearTimeout(RT);showSheet(leadSkel(findLead(id)),0);openDlg(D2);const p='leads/'+enc(id);
+ swr(p,{ttl:15000,ok:()=>my===DS&&D2.open,render:d=>{if(my===DS&&D2.open)fillLead(d)}}).catch(e=>{if(e&&my===DS)showSheet(errSheet(e.message))})}
+function fillLead(l){const w=safe(l.website),m=safe(l.maps_url),pn=$('#pn'),ps=$('#ps');
+ const dn=pn&&pn.value!==pn.defaultValue?pn.value:null,dsv=ps&&ps.value!==ps.dataset.o?ps.value:null,id=esc(l.id);
  const kv=(i,k,v)=>v?`<div class="kv">${ic(i)}<div><small>${k}</small>${v}</div></div>`:'';
- $('#pdc').innerHTML=`<div style="display:flex;gap:14px;align-items:center"><div class="av" style="width:54px;height:54px;font-size:20px">${esc(l.name[0]||'?').toUpperCase()}</div><div style="min-width:0"><h1 style="font-size:20px">${esc(l.name)}</h1><div class="sub">${esc(l.category)} · score ${l.score}</div></div></div>
+ showSheet(GRAB+`<div style="display:flex;gap:14px;align-items:center"><div class="av" style="width:54px;height:54px;font-size:20px">${initial(l.name)}</div><div style="min-width:0"><h1 style="font-size:20px">${esc(l.name)}</h1><div class="sub">${esc(l.category)} · score ${esc(l.score)}</div></div></div>
  <div class="qa">${l.link?`<a class="btn" target="_blank" rel="noopener" href="${esc(l.link)}">${ic('message-circle')}WhatsApp</a>`:''}${l.phone?`<a class="btn soft" href="tel:${esc(l.phone)}">${ic('phone')}Call</a>`:''}${m?`<a class="btn soft" target="_blank" rel="noopener" href="${esc(m)}">${ic('map')}Map</a>`:''}${w?`<a class="btn soft" target="_blank" rel="noopener" href="${esc(w)}">${ic('globe')}Website</a>`:''}</div>
- <div class="field"><label>Status</label><select id="ps">${ST.map(s=>`<option ${s==l.outreach?'selected':''}>${s}</option>`).join('')}</select></div>
+ <div class="field"><label>Status</label><select id="ps" data-o="${esc(l.outreach)}">${ST.map(s=>`<option ${s==l.outreach?'selected':''}>${s}</option>`).join('')}</select></div>
  ${kv('smartphone','Phone',l.phone?esc(l.phone)+(l.is_mobile?' (mobile, WhatsApp-ready)':' (landline)'):'')}${kv('mail','Email',l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'')}${kv('globe','Website',w?`<a target="_blank" rel="noopener" href="${esc(w)}">${esc(w)}</a>`:'')}
  ${kv('map-pin','Address',esc(l.address))}${kv('star','Rating',l.rating?esc(l.rating)+' from '+esc(l.reviews||0)+' reviews':'')}${kv('database','Source',esc(l.source)+' · '+esc(l.status||'active'))}
  ${kv('calendar','First seen',esc(when(l.first_seen)))}${kv('refresh-cw','Last seen',esc(when(l.last_seen)))}${kv('message-circle','Last contacted',esc(when(l.contacted_at)))}
  <div class="field" style="margin-top:12px"><label>Notes</label><textarea id="pn" rows="3">${esc(l.notes)}</textarea></div>
- ${l.changes.length?`<label>Recent changes</label><ul class="tl">${l.changes.map(c=>`<li><time>${esc(when(c.at))}</time><span>${esc(c.field)}: ${esc(c.old||'empty')} to ${esc(c.new||'empty')}</span></li>`).join('')}</ul>`:''}
- <div class="tools" style="margin:14px 0 0"><button class="btn" onclick="saveLead('${esc(l.id)}')">Save</button><button class="btn soft" onclick="dlg2.close()">Close</button><button class="btn ghost" onclick="dlg2.close();del('${esc(l.id)}')">${ic('trash-2')}Delete</button></div>`;
- dlg2.showModal();draw()}
-async function saveLead(id){try{await api('leads/'+encodeURIComponent(id),'PATCH',{outreach:$('#ps').value,notes:$('#pn').value});dlg2.close();toast('Saved');tab=='leads'&&leads()}catch(e){toast(e.message)}}
-let Q=[],qi=0,QM={};
-async function send(keep){const q=await api('queue');Q=q.items;QM=q;if(!keep)qi=0;if(qi>=Q.length)qi=0;drawSend()}
-function step(d){qi=(qi+d+Q.length)%Q.length;drawSend()}
-const OP=new Set();
-function drawSend(){const q=QM,p=Math.min(100,q.used/q.limit*100),l=Q[qi],prev=l?decodeURIComponent(l.link.split('text=')[1]||''):'',op=l&&OP.has(l.id);
- view(head('Send','Three taps per lead')+`<div class="glass pad" style="margin-bottom:14px;padding:14px 18px"><div class="top" style="margin:0"><b>Sent today</b><span class="sub">${q.used} of ${q.limit}</span></div><div class="bar"><i style="width:${p}%"></i></div></div>`+
- (l?`<div class="glass focus"><div class="pager"><button class="btn soft" aria-label="Previous" onclick="step(-1)">${ic('chevron-left')}</button><b>Lead ${qi+1} of ${Q.length}</b><button class="btn soft" aria-label="Skip to next" onclick="step(1)">${ic('chevron-right')}</button></div>
- <div class="who"><div class="av">${esc(l.name[0]||'?').toUpperCase()}</div><div style="min-width:0"><h2>${esc(l.name)}</h2><div class="sub">${esc(l.category)} · ${esc(l.phone)}</div></div></div>
- <div class="lbl">Message you will send</div><div class="bubble">${esc(prev)}</div><div style="text-align:right"><button class="btn ghost sm" onclick="go('set')">${ic('pencil')}Edit message</button></div>
+ ${(l.changes||[]).length?`<label>Recent changes</label><ul class="tl">${l.changes.map(c=>`<li><time>${esc(when(c.at))}</time><span>${esc(c.field)}: ${esc(c.old||'empty')} to ${esc(c.new||'empty')}</span></li>`).join('')}</ul>`:''}
+ <div class="tools" style="margin:14px 0 0"><button class="btn" data-a="lsave" data-id="${id}">Save</button><button class="btn soft" data-a="close">Close</button><button class="btn ghost" data-a="ldel" data-id="${id}">${ic('trash-2')}Delete</button></div>`,1);
+ if(dn!=null)$('#pn').value=dn;if(dsv!=null)$('#ps').value=dsv}
+async function saveLead(id,btn){const o=$('#ps').value,n=$('#pn').value;btn.setAttribute('disabled','');
+ try{await api('leads/'+enc(id),'PATCH',{outreach:o,notes:n});patchLeadCaches(id,{outreach:o,notes:n});afterMut();closeDlg(D2);toast('Saved');INIT.leads&&loadLeads()}
+ catch(e){btn.removeAttribute('disabled');e&&toast(e.message)}}
+
+/* ============ ADD BUSINESSES ============ */
+const AD={m:'m',rows:[{}],bulk:'',skip:1,busy:0,res:null,err:'',pg:0,pgt:0,L:[],jerr:0,built:0};
+const norm=p=>String(p||'').replace(/\D/g,'').slice(-10);
+let EX=null,EXV=-1,AU=0;
+function existing(){if(EXV!==LV){EX=new Set();for(const[k,c]of C)if(k.startsWith('leads?')&&Array.isArray(c.d))for(const l of c.d){const n=norm(l.phone);if(n.length>=7)EX.add(n)}EXV=LV}return EX}
+function mk(o,x){const g=k=>String(o[k]??'').trim();return Object.assign({raw:o,name:g('name'),phone:g('phone'),category:g('category'),website:g('website'),address:g('address'),tags:[],dup:0,err:0},x)}
+function parseBulk(t){AD.jerr=0;t=t.trim();if(!t)return[];let j=null;try{j=JSON.parse(t)}catch(e){}
+ if(j&&typeof j=='object'){return(Array.isArray(j)?j:[j]).map((o,i)=>{o=o&&typeof o=='object'?o:{};return mk(o,{json:1,src:i})})}
+ if(/^[\[{]/.test(t))AD.jerr=1;
+ return t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map((line,i)=>{const p=line.split(/[,|\t]/).map(x=>x.trim());const o={name:p[0],phone:p[1]||''};
+  if(p[2])o.category=p[2];if(p[3])o.website=p[3];if(p.length>4){const a=p.slice(4).join(', ');if(a)o.address=a}return mk(o,{line,src:i})})}
+function entries(){
+ if(AD.m=='m'){const L=[];AD.rows.forEach((r,i)=>{const o={name:(r.name||'').trim(),phone:(r.phone||'').trim()};['category','website','address'].forEach(k=>{const v=(r[k]||'').trim();if(v)o[k]=v});
+  if(o.name||o.phone||o.category||o.website||o.address)L.push(mk(o,{src:i}))});return L}
+ return parseBulk(AD.bulk)}
+function annotate(L){const seen=new Set(),ex=existing();
+ L.forEach(e=>{e.tags=[];e.dup=0;e.err=0;
+  if(!e.name){e.err=1;e.tags.push(['e','Missing name']);return}
+  const n=norm(e.phone);
+  if(!e.phone)e.tags.push(['w','No phone']);else if(n.length<10)e.tags.push(['w','Check phone']);
+  const key=n.length>=7?n:'nm:'+e.name.toLowerCase();
+  if(seen.has(key)){e.dup=1;e.tags.push(['w','Repeated in list'])}else seen.add(key);
+  if(n.length>=7&&ex.has(n)){e.dup=1;e.tags.push(['w','Already in leads'])}
+  if(!e.tags.length)e.tags.push(['','Ready'])})}
+const adValid=e=>!e.err&&!(AD.skip&&e.dup);
+function pvHTML(L){
+ const jb=AD.jerr?`<div class="err" style="margin:10px 14px">This looks like JSON but could not be read. Check brackets, commas and quotes.</div>`:'';
+ if(!L.length)return `<div class="pv"><div class="ph"><span>Preview</span><span class="sub">Nothing detected yet</span></div>${jb}<div class="pr sub" style="padding:18px 14px">${AD.m=='m'?'Fill in a business above to see it here.':'Paste your list above to see what was detected.'}</div></div>`;
+ const ok=L.filter(adValid).length,wn=L.filter(e=>e.tags.some(t=>t[0])).length;
+ return `<div class="pv"><div class="ph"><span>${L.length} detected · ${ok} will be added</span><span class="sub">${wn?wn+' with warnings':'All good'}</span></div>${jb}<div class="pl">${L.slice(0,100).map(e=>`<div class="pr"><div class="av" style="width:32px;height:32px;border-radius:10px;font-size:13px">${initial(e.name)}</div><div class="t"><b>${esc(e.name||'(no name)')}</b><small>${esc([e.phone,e.category].filter(Boolean).join(' · ')||'No details')}</small></div><div class="tg">${e.tags.map(t=>`<span class="tag ${t[0]}">${t[1]}</span>`).join('')}</div></div>`).join('')}${L.length>100?`<div class="pr sub">+ ${L.length-100} more</div>`:''}</div></div>`}
+const rowF=(r,i)=>`<div class="brow" data-i="${i}"><div class="bh"><b>Business ${i+1}</b><button class="btn ghost sm" aria-label="Remove business" data-a="adrm" data-i="${i}">${ic('trash-2')}</button></div>
+ <div class="r2"><div class="field"><label>Name *</label><input data-f="name" value="${esc(r.name)}" autocomplete="off" placeholder="Ravi Realty"></div><div class="field"><label>Phone</label><input data-f="phone" value="${esc(r.phone)}" inputmode="tel" autocomplete="off" placeholder="98450 12345"></div></div>
+ <div class="r2"><div class="field"><label>Category</label><input data-f="category" list="cats" value="${esc(r.category)}" autocomplete="off" placeholder="real estate"></div><div class="field"><label>Website</label><input data-f="website" value="${esc(r.website)}" inputmode="url" autocomplete="off" placeholder="https://"></div></div>
+ <div class="field" style="margin:0"><label>Address</label><input data-f="address" value="${esc(r.address)}" autocomplete="off" placeholder="Area, city"></div></div>`;
+function adRows(){const el=$('#adrows');if(el){el.innerHTML=AD.rows.map(rowF).join('');draw()}}
+function adBody(){const b=$('#adbody');
+ if(AD.m=='m'){b.innerHTML=`<div id="adrows"></div><button class="btn soft block" data-a="adadd">${ic('plus')}Add another business</button>`;adRows()}
+ else{b.innerHTML=`<textarea id="adbulk" rows="7" placeholder="Ravi Realty, 98450 12345, real estate&#10;Green PG | 98765 43210 | pg">${esc(AD.bulk)}</textarea><p class="sub" style="margin:8px 0 0">One per line: <b>Name, phone, type</b> (optionally add , website, address). Commas, pipes or tabs work. You can also paste a JSON array.</p>`;draw()}}
+function adFoot(){const f=$('#adft');if(!f)return;
+ if(AD.busy){paint(f,`<div class="bar"><i style="width:${AD.pgt?Math.round(AD.pg/AD.pgt*100):0}%"></i></div><p class="sub" style="margin:8px 0 0">Adding ${AD.pg} of ${AD.pgt}...</p>`,1);return}
+ const n=AD.L.filter(adValid).length,dc=AD.L.filter(e=>e.dup).length;
+ paint(f,`${AD.err?`<div class="err">${esc(AD.err)}</div>`:''}${dc?`<label class="ck"><input type="checkbox" id="adskip" ${AD.skip?'checked':''}>Skip duplicates (${dc})</label>`:''}
+ <div class="tools" style="margin:14px 0 0;justify-content:flex-end"><button class="btn soft" data-a="close">Cancel</button><button class="btn" data-a="adgo" ${n?'':'disabled'}>${ic('plus')}Add ${n} ${n==1?'business':'businesses'}</button></div>`)}
+function adUpdate(){AD.L=entries();annotate(AD.L);
+ const nm=AD.rows.filter(r=>ADK.some(k=>(r[k]||'').trim())).length;
+ const a=$('#adn-m'),b=$('#adn-b');if(a)a.textContent=nm?'('+nm+')':'';if(b)b.textContent=AD.m=='b'?(AD.L.length?'('+AD.L.length+')':''):(AD.bulk.trim()?'•':'');
+ paint($('#adpv'),pvHTML(AD.L),1);adFoot()}
+const ADK=['name','phone','category','website','address'];
+const adSched=()=>{if(!AU)AU=requestAnimationFrame(()=>{AU=0;adUpdate()})};
+function adBuild(){
+ if(AD.res){const r=AD.res;$('#adc').innerHTML=GRAB+`<div class="empty" style="padding:24px 10px 10px">${ic('check-circle-2')}<h1 style="font-size:20px;margin:0 0 6px">Done</h1><div class="sub">${r.added} added · ${r.updated} updated${r.skipped?' · '+r.skipped+' left in the form':''}</div></div>
+  ${r.warnings.length?`<div class="wl"><b>${r.warnings.length} warning${r.warnings.length==1?'':'s'}</b><br>${r.warnings.slice(0,5).map(w=>esc(typeof w=='string'?w:JSON.stringify(w))).join('<br>')}${r.warnings.length>5?'<br>and more...':''}</div>`:''}
+  <div class="tools" style="margin:16px 0 0;justify-content:flex-end"><button class="btn soft" data-a="admore">${ic('plus')}Add more</button><button class="btn sage" data-a="close">Done</button></div>`;draw();return}
+ AD.built=1;
+ $('#adc').innerHTML=GRAB+`<div class="top" style="margin-bottom:12px"><div><h1 style="font-size:20px">Add businesses</h1><div class="sub">Add them by hand or paste a list.</div></div><button class="btn ghost sm" data-a="close" aria-label="Close">${ic('x')}</button></div>
+ <div class="seg" id="adseg"><button data-a="adtab" data-v="m" class="${AD.m=='m'?'on':''}">Add manually <span id="adn-m"></span></button><button data-a="adtab" data-v="b" class="${AD.m=='b'?'on':''}">Bulk paste <span id="adn-b"></span></button></div>
+ <div id="adbody"></div><div id="adpv"></div><div id="adft"></div>`;
+ $('#adpv')._h=null;$('#adft')._h=null;draw();adBody();adUpdate()}
+function openAdd(){if(AD.res||!AD.built){AD.res=null;adBuild()}else adUpdate();openDlg(D1);
+ const k=lk('').replace(/status=[^&]*&mobile=\d/,'status=&mobile=0');
+ if(!C.has(k))fetchC(k).then(()=>{if(D1.open&&!AD.res)adUpdate()}).catch(()=>{});
+ const f=D1.querySelector('input[data-f],textarea');f&&f.focus({preventScroll:true})}
+function adRemove(sent,L0){if(!sent.size)return;
+ if(AD.m=='m'){const s=new Set([...sent].map(e=>e.src));AD.rows=AD.rows.filter((r,i)=>!s.has(i));if(!AD.rows.length)AD.rows.push({})}
+ else{const rest=L0.filter(e=>!sent.has(e));AD.bulk=!rest.length?'':rest[0].json?JSON.stringify(rest.map(e=>e.raw),null,1):rest.map(e=>e.line).join('\n')}}
+async function adGo(){if(AD.busy)return;AD.L=entries();annotate(AD.L);const L0=AD.L,L=L0.filter(adValid);if(!L.length)return;
+ AD.busy=1;AD.err='';AD.pgt=L.length;AD.pg=0;const body=$('#adbody');body.inert=true;adFoot();
+ const agg={added:0,updated:0,warnings:[],skipped:0},sent=new Set();let failed=false;
+ try{for(let i=0;i<L.length;i+=20){const ch=L.slice(i,i+20),r=await api('leads','POST',ch.map(e=>e.raw));
+   agg.added+=(r&&r.added)||0;agg.updated+=(r&&r.updated)||0;((r&&r.warnings)||[]).forEach(w=>agg.warnings.push(w));ch.forEach(e=>sent.add(e));AD.pg=Math.min(L.length,i+20);adFoot()}}
+ catch(e){failed=true;AD.err=(e&&e.message)||'';if(e)AD.err+=(sent.size?` ${sent.size} saved before the error.`:'')+' Your remaining entries were kept.'}
+ adRemove(sent,L0);AD.busy=0;body.inert=false;
+ if(sent.size){afterMut();INIT.leads&&loadLeads()}
+ if(!failed){agg.skipped=Math.max(0,L0.length-sent.size);AD.res=agg;toast(`Added ${agg.added}, updated ${agg.updated}`+(agg.warnings.length?`, ${agg.warnings.length} warning(s)`:''));adBuild()}
+ else{adBody();$('#adft')._h=null;adUpdate()}}
+
+/* ============ FIND ============ */
+const FTS=[['scrape','Maps scraper'],['osm','OpenStreetMap'],['google','Google API']],FD={scrape:'Free. Opens Google Maps in a hidden browser. Most complete, takes a few minutes.',osm:'Free. Open map data, fast, but many shops have no phone listed.',google:'Official Google Places. Free tier each month, then paid. Needs an API key.'};
+let FS='scrape',FV={},JV=-1,JR=false,FB=0;const SKJ=`<div class="glass pad" style="margin-top:14px"><div class="top" style="margin:0 0 12px"><div style="display:flex;gap:10px;align-items:center">${sk('18px','18px','border-radius:50%')}${sk('110px','16px')}</div></div>${sk('100%','8px','display:block;border-radius:9px')}<div class="grid" style="margin:14px 0 0;grid-template-columns:repeat(3,1fr)">${[1,2,3].map(()=>`<div>${sk('38px','24px','display:block;margin-bottom:6px')}${sk('56px','11px','display:block')}</div>`).join('')}</div></div>`;
+const keep=()=>{const g=id=>{const e=$('#'+id);return e?e.value:undefined};FV={c:g('fc')??FV.c,l:g('fl')??FV.l,n:g('fn')??FV.n,r:g('fr')??FV.r,k:g('fk')??FV.k}};
+function shFind(){$('#p-find').innerHTML=head('Find businesses','Pick a source, then search')+`<div class="seg" id="fseg">${FTS.map(t=>`<button data-a="src" data-v="${t[0]}" class="${t[0]==FS?'on':''}">${t[1]}</button>`).join('')}</div><div class="glass pad" id="ff"></div><div id="jm"></div>`;renderForm()}
+function renderForm(){const s=(C.get('settings')||{}).d||{};
+ $('#ff').innerHTML=`<p class="sub" style="margin:0 0 16px">${FD[FS]}</p><div class="field"><label>Business type</label><input id="fc" placeholder="${FS=='osm'?'real estate, pg, gym or shop=bakery':'e.g. real estate'}" value="${esc(FV.c||'')}">
+ <div class="chips">${['real estate','pg','gym','clinic','salon'].map(c=>`<button data-a="fill" data-t="fc" data-v="${c}">${c}</button>`).join('')}</div></div>
+ <div class="field"><label>Area and city</label><input id="fl" placeholder="Indiranagar, Bengaluru" value="${esc(FV.l??s.last_location??'')}"></div>
+ <div class="field"><label>How many to keep (1 to 100)</label><input id="fn" type="number" inputmode="numeric" min="1" max="100" value="${esc(FV.n||20)}"><div class="chips">${[10,20,30,50].map(n=>`<button data-a="fill" data-t="fn" data-v="${n}">${n}</button>`).join('')}</div></div>
+ ${FS!='scrape'?`<div class="field"><label>Search radius in km (1 to 50)</label><input id="fr" type="number" inputmode="numeric" min="1" max="50" value="${esc(FV.r||5)}"><div class="chips">${[2,5,10,20].map(n=>`<button data-a="fill" data-t="fr" data-v="${n}">${n} km</button>`).join('')}</div></div>`:''}
+ ${FS=='google'?'<div id="gx"></div>':''}<button class="btn block" id="fgo" data-a="find">${ic('search')}Start search</button>`;draw();fillGx()}
+function fillGx(){const g=$('#gx');if(!g)return;const k=$('#fk');if(k)FV.k=k.value;const s=((C.get('settings')||{}).d);
+ g.innerHTML=`<div class="field"><label>Google API key</label><input id="fk" type="password" autocomplete="off" placeholder="${s&&s.has_google_key?'Saved. Leave empty to keep it':'Paste your key'}" value="${esc(FV.k||'')}">
+ ${s?`<div class="bar"><i style="width:${s.google_cap?Math.min(100,s.google_used/s.google_cap*100):0}%"></i></div><p class="sub" style="margin:6px 0 0">${esc(s.google_used)} of ${esc(s.google_cap)} calls used this month. Search stops at the cap.</p>`:`<div style="margin-top:10px">${sk('100%','8px','display:block;border-radius:9px')}</div>`}</div>`}
+function fillFind(s){const l=$('#fl');if(l&&FV.l==null&&!l.value&&s.last_location)l.value=s.last_location;fillGx()}
+async function startFind(){const n=parseInt($('#fn').value);if(!(n>=1&&n<=100))return toast('Enter a number from 1 to 100');if(FB)return;FB=1;const btn=$('#fgo');btn&&btn.setAttribute('disabled','');
+ try{await api('find','POST',{source:FS,category:$('#fc').value,location:$('#fl').value,n,radius_km:$('#fr')?.value,api_key:$('#fk')?.value});
+  stale(/^settings/);JV=-1;paint($('#jm'),SKJ,1);poller(poll,3000,true)}
+ catch(e){e&&toast(e.message)}finally{FB=0;btn&&btn.removeAttribute('disabled')}}
+async function poll(sig){const b=$('#jm');if(!b)return false;const j=await api('job?v='+JV,'GET',null,{signal:sig});
+ if(!j){if(b._h===SKJ)paint(b,'',1);return JR}
+ JV=j.v;const was=JR;JR=j.running;if(was&&!JR)afterJob();
+ if(j.msg=='idle'){paint(b,'',1);return false}
+ const pct=j.total?Math.round(j.done/j.total*100):0;
+ paint(b,`<div class="glass pad" style="margin-top:14px"><div class="top" style="margin:0 0 12px"><div style="display:flex;gap:10px;align-items:center">${j.running?'<div class="spinner"></div>':ic('check-circle-2')}<b>${esc(j.running?j.phase||'Working':'Finished')}</b></div><span class="sub">${j.running&&j.total?pct+'%':''}</span></div>
+ <div class="bar"><i style="width:${j.running?(j.total?pct:6):100}%"></i></div><div class="grid" style="margin:14px 0 0;grid-template-columns:repeat(3,1fr)">${[['Collected',j.collected||0],['Skipped',j.skipped||0],['Checked',(j.done||0)+'/'+(j.total||'-')]].map(x=>`<div><b style="font-size:22px">${x[1]}</b><div class="sub">${x[0]}</div></div>`).join('')}</div>
+ <p class="sub" style="margin:12px 0 0">${esc(j.msg)}</p>${j.run_id?`<button class="btn soft sm" style="margin-top:10px" data-a="go" data-v="runs">${ic('history')}View run log</button>`:''}</div>`);
+ return j.running}
+async function loadFind(){JV=-1;const b=$('#jm');if(!b._h)paint(b,SKJ,1);poller(poll,3000,true);swr('settings',{ttl:60000,render:fillFind}).catch(()=>{})}
+
+/* ============ RUNS ============ */
+function shRuns(){$('#p-runs').innerHTML=head('Runs','Every search and what happened')+`<div id="rl" class="glass list">${skRows(5)}</div>`}
+function fillRuns(d){paint($('#rl'),d.length?d.map(r=>`<div class="lead" data-a="run" data-id="${esc(r.id)}"><div class="av">${ic(r.status=='running'?'loader':r.status=='failed'?'alert-circle':'check')}</div><div class="t"><b>${esc(r.query)}${r.location?' in '+esc(r.location):''}</b>
+ <small>${esc(when(r.at))} · ${esc(r.fetched)} found · ${esc(r.added)} new${r.source!='scrape'?' · '+esc(r.source):''}</small></div><span class="score ${r.status=='running'?'hi':''}">${esc(r.status||'done')}</span><span class="chev">${ic('chevron-right')}</span></div>`).join(''):`<div class="empty">${ic('history')}<div>No runs yet. Start one from Find.</div></div>`)}
+async function loadRuns(){const live=d=>d.some(r=>r.status=='running');
+ const d=await swr('runs',{ttl:4000,render:fillRuns});
+ if(tab=='runs'&&live(d))poller(async sig=>{const r=await fetchC('runs',{signal:sig});if(r.changed)fillRuns(r.d);return live(r.d)},5000)}
+const runSkel=()=>GRAB+`<div>${sk('70%','22px','display:block;margin-bottom:8px')}${sk('45%','13px','display:block')}</div><div class="grid" style="margin:16px 0;grid-template-columns:repeat(4,1fr)">${[1,2,3,4].map(()=>`<div>${sk('36px','24px','display:block;margin-bottom:6px')}${sk('48px','11px','display:block')}</div>`).join('')}</div><label>Events</label>${[1,2,3,4,5].map(()=>sk('100%','14px','display:block;margin:12px 0')).join('')}<button class="btn soft block" style="margin-top:12px" data-a="close">Close</button>`;
+function fillRun(d){const r=d.run,e=d.events||[];
+ showSheet(GRAB+`<h1 style="font-size:20px">${esc(r.query)}${r.location?' in '+esc(r.location):''}</h1><div class="sub">${esc(when(r.at))} · ${esc(r.status||'done')}${r.finished_at?' · finished '+esc(when(r.finished_at)):''}</div>
+ <div class="grid" style="margin:16px 0;grid-template-columns:repeat(4,1fr)">${[['Asked',r.requested||'-'],['Found',r.fetched],['New',r.added],['Updated',r.changed]].map(x=>`<div><b style="font-size:22px">${esc(x[1])}</b><div class="sub">${x[0]}</div></div>`).join('')}</div>
+ ${r.error?`<p class="sub" style="color:var(--tom)">${esc(r.error)}</p>`:''}<label>Events</label><ul class="tl">${e.length?e.slice(-200).reverse().map(x=>`<li><time>${hm(x.at)}</time><span class="${x.kind=='warn'?'w':''}">${esc(x.text)}</span></li>`).join(''):'<li class="sub">No events recorded for this run.</li>'}</ul>
+ <button class="btn soft block" style="margin-top:12px" data-a="close">Close</button>`,1)}
+function openRun(id){const my=++DS;clearTimeout(RT);showSheet(runSkel(),0);openDlg(D2);const p='runs/'+id;
+ const loop=async()=>{if(my!==DS||!D2.open)return;let more=false;
+  try{if(document.hidden)more=true;else{const r=await fetchC(p);if(my!==DS)return;if(r.changed)fillRun(r.d);more=r.d.run.status=='running'}}catch(e){}
+  if(more&&my===DS)RT=setTimeout(loop,4000)};
+ swr(p,{ttl:3000,ok:()=>my===DS,render:d=>{if(my===DS)fillRun(d)}}).then(d=>{if(my===DS&&d&&d.run&&d.run.status=='running')RT=setTimeout(loop,4000)}).catch(e=>{if(e&&my===DS)showSheet(errSheet(e.message))})}
+
+/* ============ SEND ============ */
+let Q=[],qi=0,QM={items:[],used:0,limit:0};const OP=new Set();
+const sendSkel=()=>`<div class="glass focus"><div class="pager">${sk('40px','42px','border-radius:12px')}${sk('90px','16px')}${sk('40px','42px','border-radius:12px')}</div><div class="who">${sk('52px','52px','border-radius:14px')}<div style="flex:1">${sk('55%','22px','display:block;margin-bottom:6px')}${sk('35%','13px','display:block')}</div></div>
+ <div class="lbl">Message you will send</div>${sk('92%','86px','display:block;margin-left:auto;border-radius:18px')}<div class="steps">${[1,2,3].map(()=>`<div class="stp">${sk('30px','30px','border-radius:50%;display:block;margin:0 auto 6px')}${sk('64px','11px')}</div>`).join('')}</div>${sk('100%','52px','display:block;border-radius:14px')}</div>`;
+function shSend(){$('#p-send').innerHTML=head('Send','Three taps per lead')+`<div class="glass pad" style="margin-bottom:14px;padding:14px 18px"><div class="top" style="margin:0"><b>Sent today</b><span class="sub" id="sn">${sk('64px','14px')}</span></div><div class="bar"><i id="sb" style="width:0"></i></div></div><div id="sq">${sendSkel()}</div>`}
+function onQueue(q){const pid=Q[qi]&&Q[qi].id;QM=q;Q=q.items||[];const k=pid==null?-1:Q.findIndex(x=>x.id===pid);qi=k>=0?k:(qi>=Q.length?0:qi);QM.loaded=1;drawSend()}
+const loadSend=()=>swr('queue',{ttl:6000,render:onQueue});
+function drawSend(){const q=QM,l=Q[qi],op=l&&OP.has(l.id);
+ $('#sn').textContent=`${q.used} of ${q.limit}`;$('#sb').style.width=(q.limit?Math.min(100,q.used/q.limit*100):0)+'%';
+ let prev='';if(l)try{prev=decodeURIComponent(l.link.split('text=')[1]||'')}catch(e){prev=''}const id=l?esc(l.id):'';
+ paint($('#sq'),l?`<div class="glass focus"><div class="pager"><button class="btn soft" aria-label="Previous" data-a="step" data-v="-1">${ic('chevron-left')}</button><b>Lead ${qi+1} of ${Q.length}</b><button class="btn soft" aria-label="Skip to next" data-a="step" data-v="1">${ic('chevron-right')}</button></div>
+ <div class="who"><div class="av">${initial(l.name)}</div><div style="min-width:0"><h2>${esc(l.name)}</h2><div class="sub">${esc(l.category)} · ${esc(l.phone)}</div></div></div>
+ <div class="lbl">Message you will send</div><div class="bubble">${esc(prev)}</div><div style="text-align:right"><button class="btn ghost sm" data-a="edit">${ic('pencil')}Edit message</button></div>
  <div class="steps"><div class="stp ${op?'ok':'on'}"><div class="n">${op?ic('check'):1}</div>Open WhatsApp</div><div class="stp ${op?'on':''}"><div class="n">2</div>Press send there</div><div class="stp"><div class="n">3</div>Mark as sent</div></div>`+
- (op?`<button class="btn sage block big" onclick="mark('${esc(l.id)}','messaged')">${ic('check')}Done, I sent it</button><p class="hint">Back from WhatsApp? Tap above. <a href="${esc(l.link)}" target="_blank" rel="noopener" style="color:var(--sd);font-weight:600">Open again</a></p>`
- :`<a class="btn block big" target="_blank" rel="noopener" href="${esc(l.link)}" onclick="OP.add('${esc(l.id)}');setTimeout(drawSend,500)">${ic('message-circle')}Open WhatsApp</a><p class="hint">The message is already typed for you.</p>`)+
- `<div class="alt"><button class="btn ghost sm" onclick="mark('${esc(l.id)}','bad_number')">${ic('phone-off')}Wrong number</button><button class="btn ghost sm" onclick="mark('${esc(l.id)}','do_not_contact')">${ic('ban')}Don't contact</button></div></div>
+ (op?`<button class="btn sage block big" data-a="mk" data-id="${id}" data-v="messaged">${ic('check')}Done, I sent it</button><p class="hint">Back from WhatsApp? Tap above. <a href="${esc(l.link)}" target="_blank" rel="noopener" style="color:var(--sd);font-weight:600">Open again</a></p>`
+ :`<a class="btn block big" target="_blank" rel="noopener" href="${esc(l.link)}" data-a="wa" data-id="${id}">${ic('message-circle')}Open WhatsApp</a><p class="hint">The message is already typed for you.</p>`)+
+ `<div class="alt"><button class="btn ghost sm" data-a="mk" data-id="${id}" data-v="bad_number">${ic('phone-off')}Wrong number</button><button class="btn ghost sm" data-a="mk" data-id="${id}" data-v="do_not_contact">${ic('ban')}Don't contact</button></div></div>
  <p class="hint">Use the arrows to skip. Skipped leads come back around.</p>`
- :`<div class="glass empty">${ic('party-popper')}<div>${q.used>=q.limit?'Daily limit reached. Rest now and continue tomorrow.':'No leads ready. Use Find to get more.'}</div></div>`))}
-async function mark(id,o){await api('leads/'+encodeURIComponent(id),'PATCH',{outreach:o});toast(o=='messaged'?'Marked as sent':'Updated',async()=>{await api('leads/'+encodeURIComponent(id),'PATCH',{outreach:'new'});send(true)});send(true)}
-async function set(){const s=await api('settings');view(head('Settings','Message and daily limit')+`<div class="glass pad"><div class="field"><label>Message template</label><textarea id="tp" rows="5">${esc(s.template)}</textarea>
+ :`<div class="glass empty">${ic('party-popper')}<div>${q.used>=q.limit&&q.limit?'Daily limit reached. Rest now and continue tomorrow.':'No leads ready. Use Find to get more.'}</div></div>`)}
+async function mark(id,o){const i=Q.findIndex(x=>String(x.id)==id),it=Q[i];
+ if(i>=0){Q.splice(i,1);if(o=='messaged')QM.used++;if(qi>=Q.length)qi=0;put('queue',QM);drawSend()}
+ try{await api('leads/'+enc(id),'PATCH',{outreach:o});patchLeadCaches(id,{outreach:o});afterMut();
+  toast(o=='messaged'?'Marked as sent':'Updated',async()=>{try{await api('leads/'+enc(id),'PATCH',{outreach:'new'});patchLeadCaches(id,{outreach:'new'});afterMut();swr('queue',{ttl:0,render:onQueue}).catch(()=>{})}catch(e){e&&toast(e.message)}})}
+ catch(e){if(i>=0){Q.splice(i,0,it);if(o=='messaged')QM.used--;put('queue',QM);drawSend()}e&&toast(e.message);return}
+ swr('queue',{ttl:0,render:onQueue}).catch(()=>{})}
+
+/* ============ SETTINGS ============ */
+const setSkel=()=>`${sk('120px','13px','display:block;margin-bottom:8px')}${sk('100%','120px','display:block;margin-bottom:14px;border-radius:12px')}${sk('90px','13px','display:block;margin-bottom:8px')}${sk('100%','44px','display:block;margin-bottom:14px;border-radius:12px')}<div class="tools" style="margin:0">${sk('120px','42px','border-radius:12px')}${sk('100px','42px','border-radius:12px')}</div>`;
+function shSet(){$('#p-set').innerHTML=head('Settings','Message and daily limit')+`<div class="glass pad" id="sf">${setSkel()}</div>`}
+function fillSet(s){const tp=$('#tp'),dl=$('#dl');if(tp&&dl&&(tp.value!==tp.defaultValue||dl.value!==dl.defaultValue))return;
+ paint($('#sf'),`<div class="field"><label>Message template</label><textarea id="tp" rows="5">${esc(s.template)}</textarea>
  <p class="sub" style="margin:6px 0 0">Use {name} and {category}. Say who you are and add a reply STOP opt-out.</p></div>
  <div class="field"><label>Daily limit</label><input id="dl" type="number" min="1" max="100" value="${esc(s.daily_limit)}"></div>
- <div class="tools" style="margin:0"><button class="btn" onclick="saveSet()">Save changes</button><button class="btn soft" onclick="api('logout','POST').then(()=>location.reload())">${ic('log-out')}Log out</button></div></div>`)}
-async function saveSet(){try{await api('settings','PUT',{template:$('#tp').value,daily_limit:$('#dl').value});toast('Saved')}catch(e){toast(e.message)}}
+ <div class="tools" style="margin:0"><button class="btn" data-a="savset">Save changes</button><button class="btn soft" data-a="logout">${ic('log-out')}Log out</button></div>`)}
+const loadSet=()=>swr('settings',{ttl:60000,render:fillSet});
+async function saveSet(btn){const t=$('#tp').value,d=$('#dl').value;btn.setAttribute('disabled','');
+ try{await api('settings','PUT',{template:t,daily_limit:d});const c=C.get('settings');c&&put('settings',Object.assign({},c.d,{template:t,daily_limit:d}));
+  $('#tp').defaultValue=t;$('#dl').defaultValue=d;stale(/^queue/);toast('Saved')}
+ catch(e){e&&toast(e.message)}finally{btn.removeAttribute('disabled')}}
+
+/* ============ events (delegated, registered once) ============ */
+const A={
+ go:e=>go(e.dataset.v),add:()=>openAdd(),open:e=>openLead(e.dataset.id),del:e=>del(e.dataset.id),
+ mob:e=>{LF.m=LF.m?0:1;e.className='btn '+(LF.m?'sage':'soft');loadLeads()},reload:()=>loadLeads(),
+ close:e=>closeDlg(e.closest('dialog')),ldel:e=>{closeDlg(D2);del(e.dataset.id)},lsave:e=>saveLead(e.dataset.id,e),
+ run:e=>openRun(e.dataset.id),
+ src:e=>{keep();FS=e.dataset.v;document.querySelectorAll('#fseg button').forEach(b=>b.classList.toggle('on',b.dataset.v==FS));renderForm()},
+ fill:e=>{const t=$('#'+e.dataset.t);if(t){t.value=e.dataset.v;keep()}},find:()=>startFind(),
+ step:e=>{if(Q.length){qi=(qi+ +e.dataset.v+Q.length)%Q.length;drawSend()}},
+ wa:e=>{OP.add(Q[qi]&&Q[qi].id);setTimeout(drawSend,500)},mk:e=>mark(e.dataset.id,e.dataset.v),edit:()=>go('set'),
+ savset:e=>saveSet(e),logout:()=>api('logout','POST').then(()=>location.reload()).catch(()=>{}),
+ undo:()=>{const u=window._u;window._u=null;if(u){u();toast('Restored')}},
+ adtab:e=>{if(AD.busy||AD.m==e.dataset.v)return;AD.m=e.dataset.v;document.querySelectorAll('#adseg button').forEach(b=>b.classList.toggle('on',b.dataset.v==AD.m));adBody();adUpdate()},
+ adadd:()=>{AD.rows.push({});adRows();adUpdate();const f=document.querySelector('#adrows .brow:last-child input');f&&f.focus()},
+ adrm:e=>{AD.rows.splice(+e.dataset.i,1);if(!AD.rows.length)AD.rows.push({});adRows();adUpdate()},
+ adgo:()=>adGo(),admore:()=>{AD.res=null;adBuild()}};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el)return;const f=A[el.dataset.a];if(f)f(el,e)});
+document.addEventListener('change',e=>{const t=e.target;
+ if(t.matches&&t.matches('select[data-a="st"]'))upd(t.dataset.id,t.value);
+ else if(t.id=='adskip'){AD.skip=t.checked?1:0;adUpdate()}});
+document.addEventListener('input',e=>{const t=e.target;
+ if(t.closest('#adc')){const row=t.closest('.brow');if(t.dataset.f&&row){const r=AD.rows[+row.dataset.i];if(r)r[t.dataset.f]=t.value;adSched()}else if(t.id=='adbulk'){AD.bulk=t.value;adSched()}}
+ else if(t.closest('#p-find'))keep()});
+
+const SH={dash:shDash,leads:shLeads,find:shFind,runs:shRuns,send:shSend,set:shSet},LDR={dash:loadDash,leads:loadLeads,find:loadFind,runs:loadRuns,send:loadSend,set:loadSet};
 draw();go('dash')
 </script></body></html>
