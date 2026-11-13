@@ -1,0 +1,8 @@
+{
+  "businesses": [
+    {"name": "Sunrise Realty", "category": "real estate", "phone": "+91 98450 12345",
+     "email": "hello@sunriserealty.example", "website": "https://sunriserealty.example",
+     "address": "12 MG Road, Bengaluru", "lat": 12.975, "lng": 77.606, "notes": "met at expo"},
+    {"name": "Green Nest PG", "category": "pg", "phone": "09845098450", "address": "Indiranagar"}
+  ]
+}
