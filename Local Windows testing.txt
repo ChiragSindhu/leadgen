@@ -1,0 +1,8 @@
+python -m venv .venv && .venv\Scripts\activate
+pip install -r requirements.txt
+playwright install chromium
+set DATABASE_URL=postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:5432/postgres
+set GOOGLE_API_KEY=...            (optional)
+python -m pytest tests -v -k "not live"      (offline plus DB-backed)
+python diagnose_leadpipe.py                  (adds live Overpass, Google, Playwright and a real Maps scrape)
+streamlit run app.py                         (WORKER_MODE defaults to inline)

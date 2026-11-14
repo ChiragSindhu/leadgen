@@ -8,3 +8,4 @@ __pycache__/
 leads.json
 maps_leads.json
 .DS_Store
+.pytest_cache
