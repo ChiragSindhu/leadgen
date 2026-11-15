@@ -1,6 +1,5 @@
 import os, re, shutil, time, random, queue, threading, base64, tempfile, traceback
 from urllib.parse import quote, urlparse
-from playwright.sync_api import sync_playwright
 import sbstore
 
 PROFILE      = os.getenv("WA_PROFILE", os.path.join(tempfile.gettempdir(), "wa-profile"))
@@ -8,6 +7,7 @@ MIN_GAP      = int(os.getenv("WA_MIN_GAP", "25"))
 BACKUP_EVERY = int(os.getenv("WA_BACKUP_EVERY", "1800"))
 DEFAULT_CC   = os.getenv("WA_CC", "91")
 ALBUM        = os.getenv("WA_ALBUM", "0") == "1"
+ENABLED      = os.getenv("WA_ENABLED", "1").strip().lower() not in ("0", "false", "no", "off")   # 0 = no Chromium, no Playwright
 HEADLESS     = os.getenv("WA_HEADLESS", "1") == "1"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/131.0.0.0 Safari/537.36")
@@ -18,7 +18,7 @@ ARGS = ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-e
         "--renderer-process-limit=1", "--js-flags=--max-old-space-size=256"]
 ALLOW_HOSTS = ("whatsapp.com", "whatsapp.net", "facebook.com", "fbcdn.net", "wa.me")
 
-state = dict(status="starting", qr=None, err=None, debug=None, last_ok=None, mem_mb=None)
+state = dict(status="starting" if ENABLED else "disabled", qr=None, err=None, debug=None, last_ok=None, mem_mb=None)
 _q = queue.Queue()
 
 class WAError(Exception): pass
@@ -290,6 +290,7 @@ def _launch(p):
 _act = queue.Queue()
 def request_action(name):
     """'sync' = upload profile now; 'reset' = log out locally, delete cloud copy, show a fresh QR."""
+    if not ENABLED: raise WAError("WhatsApp is disabled on this server (WA_ENABLED=0)")
     if name not in ("sync", "reset"): raise WAError("Unknown action")
     state["action"] = name; _act.put(name)
 
@@ -359,6 +360,7 @@ def _session(p):
         except Exception: pass
 
 def _run():
+    from playwright.sync_api import sync_playwright   # lazy: never imported when disabled
     if sbstore.configured():
         try: print("profile restored" if sbstore.restore_profile(PROFILE) else "no saved profile, starting fresh")
         except Exception as e: print("profile restore failed:", e)
@@ -375,11 +377,13 @@ def _run():
         time.sleep(15)
         state.update(status="starting", err=None)
 
-threading.Thread(target=_run, daemon=True).start()
+if ENABLED: threading.Thread(target=_run, daemon=True).start()
+else: print("WhatsApp automation disabled (WA_ENABLED=0)")
 
 # ---------------------------------------------------------------- public API
 def send(phone, text, files=(), step=lambda s: None, cfg=None):
     """Backward compatible. Returns 'sent' or 'unconfirmed'; raises WAError on failure."""
+    if not ENABLED: raise WAError("WhatsApp is disabled on this server (WA_ENABLED=0)")
     box = {"done": threading.Event()}
     _q.put(((phone, text, list(files), step, dict(cfg or {})), box))
     if not box["done"].wait(300 + 150 * len(files)):

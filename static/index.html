@@ -143,6 +143,9 @@ details[open]>.msum .chev svg{transform:rotate(180deg)}
 main{padding-top:62px}
 @media(max-width:800px){main{padding-top:calc(54px + env(safe-area-inset-top))}}
 
+.qa .btn{padding:0 8px;gap:6px;font-size:13px}
+.mact{display:grid;gap:8px;margin-bottom:10px}.mact .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mact .btn{height:46px;padding:0 10px;white-space:nowrap}
+.sheet .tools .btn{flex:1 1 auto}
 </style></head><body>
 <div id="login" hidden><div class="glass"><div class="brand" style="margin:0 0 20px"><span class="logo"><i data-lucide="map-pin"></i></span>Vansh Lead</div>
 <div class="field"><label>Admin password</label><input id="pw" type="password" autocomplete="current-password" onkeydown="event.key=='Enter'&&login()"></div>
@@ -231,7 +234,7 @@ const errSheet=m=>GRAB+`<div class="empty">${ic('alert-circle')}<div>${esc(m||'S
 let BUSY=null,WST={loaded:0},SPT=0,SPB=0,SPQ=0,JT=0,WB=0,PB=0,RF=0,RD=null,WS='';
 const SMS=()=>document.hidden?15000:1500;
 const busyMsg=()=>BUSY=='send'?'A WhatsApp send is running. Wait or stop it first.':BUSY=='find'?'A search is running. Wait for it to finish first.':'';
-const stMs=()=>document.hidden?30000:(BUSY||WS!='ready')?4000:10000;
+const stMs=()=>document.hidden?30000:(BUSY||(WS!='ready'&&WS!='disabled'))?4000:10000;
 function pollStatus(){clearTimeout(SPT);if(!$('#login').hidden)return;if(SPB){SPQ=1;return}SPB=1;
  api('wa/status').then(applyStatus).catch(()=>{}).finally(()=>{SPB=0;if(SPQ){SPQ=0;pollStatus();return}if($('#login').hidden)SPT=setTimeout(pollStatus,stMs())})}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollStatus()});
@@ -243,13 +246,13 @@ function applyStatus(s){if(!s)return;WST=Object.assign({},s,{loaded:1});WS=s.sta
  if(tab=='send'&&BUSY=='send'&&!(SV&&SV.running)){SJV=-1;poller(pollSend,SMS,true)}
  paintPill();paintBanner();drawIf();if(tab=='set')paintConn();if(tab=='find')updFind()}
 function paintPill(){const p=$('#wpill');if(!p)return;if(!WST.loaded||!$('#login').hidden){p.hidden=true;return}
- const m={ready:'WhatsApp connected',qr:'Scan QR',starting:'Starting...',error:'WhatsApp error'};
+ const m={ready:'WhatsApp connected',qr:'Scan QR',starting:'Starting...',error:'WhatsApp error',disabled:'WhatsApp off'};
  p.hidden=false;p.className=WST.status=='ready'?'':'warn';
  paint(p,`<span class="dot"></span>${esc(m[WST.status]||'Checking...')}${BUSY=='find'?' · searching':BUSY=='send'?' · sending':''}`,1)}
 function paintBanner(){const b=$('#d-ban');if(!b)return;if(!WST.loaded){paint(b,'',1);return}
- const ok=WST.status=='ready',L={ready:'WhatsApp connected',qr:'WhatsApp needs a QR scan',starting:'WhatsApp is starting',error:'WhatsApp error'}[WST.status]||'Checking WhatsApp',
+ const ok=WST.status=='ready',L={ready:'WhatsApp connected',qr:'WhatsApp needs a QR scan',starting:'WhatsApp is starting',error:'WhatsApp error',disabled:'WhatsApp is off on this server'}[WST.status]||'Checking WhatsApp',
  t=BUSY=='send'?'A WhatsApp send is running':BUSY=='find'?'A search is running':L,
- sub=BUSY?L:ok?'Ready to send or search':'Tap Fix to open Settings',dst=BUSY=='send'?'send':BUSY=='find'?'find':'set';
+ sub=BUSY?L:ok?'Ready to send or search':WST.status=='disabled'?'Auto-send is unavailable. Manual sending still works.':'Tap Fix to open Settings',dst=BUSY=='send'?'send':BUSY=='find'?'find':'set';
  paint(b,`<div class="glass pad" style="margin-bottom:14px;display:flex;gap:12px;align-items:center${ok||BUSY?'':';background:#fbe6cf'}">${BUSY?'<div class="spinner"></div>':ic(ok?'check-circle-2':'alert-triangle')}<div style="flex:1;min-width:0"><b>${t}</b><div class="sub">${esc(sub)}</div></div><button class="btn soft sm" data-a="go" data-v="${dst}">${BUSY?'View':ok?'Open':'Fix'}</button></div>`)}
 function endSend(){SV=Object.assign({},SV,{running:false});drawIf();
  api('send/job?v=-1').then(j=>{if(j)SV=Object.assign({},j,{running:false});sendDone(SV);drawIf()}).catch(()=>sendDone(SV))}
@@ -347,14 +350,15 @@ function fillLead(l){const w=safe(l.website),m=safe(l.maps_url),pn=$('#pn'),ps=$
  const dn=pn&&pn.value!==pn.defaultValue?pn.value:null,dsv=ps&&ps.value!==ps.dataset.o?ps.value:null,id=esc(l.id);
  const kv=(i,k,v)=>v?`<div class="kv">${ic(i)}<div><small>${k}</small>${v}</div></div>`:'';
  showSheet(GRAB+`<div style="display:flex;gap:14px;align-items:center"><div class="av" style="width:54px;height:54px;font-size:20px">${initial(l.name)}</div><div style="min-width:0"><h1 style="font-size:20px">${esc(l.name)}</h1><div class="sub">${esc(l.category)} · score ${esc(l.score)}</div></div></div>
- <div class="qa">${l.link?`<a class="btn" target="_blank" rel="noopener" href="${esc(l.link)}">${ic('message-circle')}WhatsApp</a>`:''}${l.phone?`<a class="btn soft" href="tel:${esc(l.phone)}">${ic('phone')}Call</a>`:''}${m?`<a class="btn soft" target="_blank" rel="noopener" href="${esc(m)}">${ic('map')}Map</a>`:''}${w?`<a class="btn soft" target="_blank" rel="noopener" href="${esc(w)}">${ic('globe')}Website</a>`:''}</div>
+ <div class="qa">${l.phone?`<a class="btn soft" href="tel:${esc(l.phone)}">${ic('phone')}Call</a>`:''}${m?`<a class="btn soft" target="_blank" rel="noopener" href="${esc(m)}">${ic('map')}Map</a>`:''}${w?`<a class="btn soft" target="_blank" rel="noopener" href="${esc(w)}">${ic('globe')}Website</a>`:''}</div>
+ ${l.phone?`<div class="lbl" style="margin:4px 0 8px">Send message</div><div class="mact">${l.link?`<a class="btn" target="_blank" rel="noopener" href="${esc(l.link)}">${ic('message-circle')}Send text on WhatsApp</a>`:''}<div class="two"><button class="btn soft" data-a="media" data-id="${id}">${ic('image')}Send media</button><button class="btn soft" data-a="copytxt" data-id="${id}">${ic('copy')}Copy text</button></div><button class="btn soft" data-a="auto" data-id="${id}" ${WS=='ready'&&!BUSY?'':'disabled'}>${ic('zap')}Auto send text + media</button></div><p class="hint" style="text-align:left;margin:0 0 14px">Send text opens WhatsApp with the message typed. Press send, come back, then tap Send media.${WS=='ready'?'':' Auto send needs WhatsApp connected.'}</p>`:''}
  <div class="field"><label>Status</label><select id="ps" data-o="${esc(l.outreach)}">${ST.map(s=>`<option ${s==l.outreach?'selected':''}>${s}</option>`).join('')}</select></div>
  ${kv('smartphone','Phone',l.phone?esc(l.phone)+(l.is_mobile?' (mobile, WhatsApp-ready)':' (landline)'):'')}${kv('mail','Email',l.email?`<a href="mailto:${esc(l.email)}">${esc(l.email)}</a>`:'')}${kv('globe','Website',w?`<a target="_blank" rel="noopener" href="${esc(w)}">${esc(w)}</a>`:'')}
  ${kv('map-pin','Address',esc(l.address))}${kv('star','Rating',l.rating?esc(l.rating)+' from '+esc(l.reviews||0)+' reviews':'')}${kv('database','Source',esc(l.source)+' · '+esc(l.status||'active'))}
  ${kv('calendar','First seen',esc(when(l.first_seen)))}${kv('refresh-cw','Last seen',esc(when(l.last_seen)))}${kv('message-circle','Last contacted',esc(when(l.contacted_at)))}
  <div class="field" style="margin-top:12px"><label>Notes</label><textarea id="pn" rows="3">${esc(l.notes)}</textarea></div>
  ${(l.changes||[]).length?`<label>Recent changes</label><ul class="tl">${l.changes.map(c=>`<li><time>${esc(when(c.at))}</time><span>${esc(c.field)}: ${esc(c.old||'empty')} to ${esc(c.new||'empty')}</span></li>`).join('')}</ul>`:''}
- <div class="tools" style="margin:14px 0 0"><button class="btn" data-a="lsave" data-id="${id}">Save</button><button class="btn soft" data-a="front" data-id="${id}">${ic('arrow-up')}Send first</button><button class="btn soft" data-a="close">Close</button><button class="btn ghost" data-a="ldel" data-id="${id}">${ic('trash-2')}Delete</button></div>`,1);
+ <div class="tools" style="margin:14px 0 0"><button class="btn" data-a="lsave" data-id="${id}">Save</button>${l.phone?`<button class="btn soft" data-a="front" data-id="${id}">${ic('arrow-up')}Send first</button>`:''}<button class="btn soft" data-a="close">Close</button><button class="btn ghost" data-a="ldel" data-id="${id}">${ic('trash-2')}Delete</button></div>`,1);
  if(dn!=null)$('#pn').value=dn;if(dsv!=null)$('#ps').value=dsv}
 async function saveLead(id,btn){const o=$('#ps').value,n=$('#pn').value;btn.setAttribute('disabled','');
  try{await api('leads/'+enc(id),'PATCH',{outreach:o,notes:n});patchLeadCaches(id,{outreach:o,notes:n});afterMut();closeDlg(D2);toast('Saved');INIT.leads&&loadLeads()}
@@ -535,15 +539,15 @@ function drawSend(){const q=QM,l=Q[qi],ready=WS=='ready',hm=mon().length,run=SV&
  const open=`<a href="${l?esc(l.link):''}" target="_blank" rel="noopener" style="color:var(--sd);font-weight:600">Open again</a>`;
  const main=!l?'':st==0?`<a class="btn block big" target="_blank" rel="noopener" href="${esc(l.link)}" data-a="wa" data-id="${id}">${ic('message-circle')}Open WhatsApp</a><p class="hint">The message is already typed for you.</p>`
   :st<fin?`<button class="btn block big" data-a="media" data-id="${id}" ${bz?'disabled':''}>${ic('image')}Send media (${hm} file${hm>1?'s':''})</button><p class="hint">Phone: pick WhatsApp in the share sheet, then the same chat. Computer: files download, drag them into the chat. ${open}</p>`
-  :`<button class="btn sage block big" data-a="mk" data-id="${id}" data-v="messaged">${ic('check')}Done, I sent it</button><p class="hint">Back from WhatsApp? Tap above. ${open}</p>`;
- paint($('#sq'),`<div class="tools"><button class="btn sage" data-a="sendall" ${ready&&Q.length&&!bz?'':'disabled'}>${ic('zap')}Send all (${Q.length})</button><span class="sub" style="align-self:center">${ready?'WhatsApp connected':'WhatsApp not connected. Set up in Settings.'}</span></div>`+(bz?`<div class="wl" style="margin:0 0 12px">${esc(busyMsg())}</div>`:'')+
+  :`<button class="btn sage block big" data-a="mk" data-id="${id}" data-v="messaged">${ic('check')}Done, I sent it</button><p class="hint">Back from WhatsApp? Tap above. ${open}</p>${hm?`<div style="text-align:center;margin-top:8px"><button class="btn soft sm" data-a="media" data-id="${id}" ${bz?'disabled':''}>${ic('image')}Send media again</button></div>`:''}`;
+ paint($('#sq'),`<div class="tools"><button class="btn sage" data-a="sendall" ${ready&&Q.length&&!bz?'':'disabled'}>${ic('zap')}Send all (${Q.length})</button><span class="sub" style="align-self:center">${ready?'WhatsApp connected':WS=='disabled'?'WhatsApp auto-send is off. Manual sending still works.':'WhatsApp not connected. Set up in Settings.'}</span></div>`+(bz?`<div class="wl" style="margin:0 0 12px">${esc(busyMsg())}</div>`:'')+
  (l?`<div class="glass focus${fresh?' cin':''}"><div class="pager"><button class="btn soft" aria-label="Previous" data-a="step" data-v="-1">${ic('chevron-left')}</button><b>Lead ${qi+1} of ${Q.length}</b><button class="btn soft" aria-label="Skip to next" data-a="step" data-v="1">${ic('chevron-right')}</button></div>
  <div class="who"><div class="av">${initial(l.name)}</div><div style="min-width:0"><h2>${esc(l.name)}</h2><div class="sub">${esc(l.category)} · ${esc(l.phone)}</div></div></div>
- <div class="lbl">Message you will send${hm?` + ${hm} media`:''}</div><div class="bubble">${esc(prev)}</div><div style="text-align:right"><button class="btn ghost sm" data-a="edit">${ic('pencil')}Edit message</button></div>
+ <div class="lbl">Message you will send${hm?` + ${hm} media`:''}</div><div class="bubble">${esc(prev)}</div>${hm?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;justify-content:flex-end">${mon().map(m=>m.type.startsWith('video')?`<div class="mth" style="display:grid;place-items:center">${ic('play-circle')}</div>`:`<img class="mth" loading="lazy" src="/api/media/${esc(m.id)}/file" alt="">`).join('')}</div>`:''}<div style="text-align:right"><button class="btn ghost sm" data-a="edit">${ic('pencil')}Edit message</button></div>
  <div class="steps">${labels.map((t,i)=>`<div class="stp ${i<st?'ok':i==st?'on':''}"><div class="n">${i<st?ic('check'):i+1}</div>${t}</div>`).join('')}</div>${main}
  <button class="btn soft block" style="margin-top:12px" data-a="auto" data-id="${id}" ${ready&&!bz?'':'disabled'}>${ic('zap')}Auto send this lead</button>
- <p class="hint">Opens the chat, sends your text${hm?` and ${hm} media file${hm>1?'s':''}`:''}, then marks it sent.${ready?'':' Connect WhatsApp in Settings first.'}</p>
- ${qi>0?`<button class="btn ghost sm" data-a="front" data-id="${id}">${ic('arrow-up')}Move to front</button>`:''}<button class="btn ghost sm" data-a="mk" data-id="${id}" data-v="bad_number">${ic('phone-off')}Wrong number</button><button class="btn ghost sm" data-a="mk" data-id="${id}" data-v="do_not_contact">${ic('ban')}Don't contact</button></div></div>
+ <p class="hint">Opens the chat, sends your text${hm?` and ${hm} media file${hm>1?'s':''}`:''}, then marks it sent.${ready?'':WS=='disabled'?' Auto-send is off on this server.':' Connect WhatsApp in Settings first.'}</p>
+ <div class="alt">${qi>0?`<button class="btn ghost sm" data-a="front" data-id="${id}">${ic('arrow-up')}Move to front</button>`:''}<button class="btn ghost sm" data-a="mk" data-id="${id}" data-v="bad_number">${ic('phone-off')}Wrong number</button><button class="btn ghost sm" data-a="mk" data-id="${id}" data-v="do_not_contact">${ic('ban')}Don't contact</button></div></div>
  <p class="hint">Use the arrows to skip. Skipped leads come back around.</p>`
  :`<div class="glass empty">${ic('party-popper')}<div>${q.used>=q.limit&&q.limit?'Daily limit reached. Rest now and continue tomorrow.':'No leads ready. Use Find to get more.'}</div></div>`))}
 
@@ -553,12 +557,17 @@ function openSendAll(){if(BUSY)return toast(busyMsg());const max=Math.min(Q.leng
  <div class="field" style="margin-top:14px"><label>How many leads (max ${max})</label><input id="san" type="number" min="1" max="${max}" value="${Math.min(max,20)}"></div>
  <label class="ck"><input type="checkbox" onchange="$('#sago').disabled=!this.checked">I understand the risk</label>
  <div class="tools" style="margin:16px 0 0;justify-content:flex-end"><button class="btn soft" data-a="close">Cancel</button><button class="btn" id="sago" data-a="sendgo" disabled>${ic('zap')}Start sending</button></div>`);openDlg(D2)}
-async function shareMedia(id,btn){if(BUSY)return toast(busyMsg());const ms=mon()||[];btn.setAttribute('disabled','');
+async function shareMedia(id,btn){if(BUSY)return toast(busyMsg());
+ if(!C.has('media')){try{const r=await fetchC('media');fillMedia(r.d)}catch(e){return e&&toast(e.message)}}
+ const ms=mon();if(!ms.length)return toast('No media is switched on. Tick files in Settings > Media.');
+ btn.setAttribute('disabled','');const old=btn.innerHTML;btn.innerHTML='<span class="spinner"></span>Preparing files...';
  try{const files=await Promise.all(ms.map(async m=>{let b=BL.get(m.id);if(!b){const r=await fetch('/api/media/'+m.id+'/file');if(!r.ok)throw new Error('Could not load '+m.name);b=await r.blob();BL.set(m.id,b)}return new File([b],m.name||m.id,{type:m.type})}));
-  if(navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files})}catch(e){if(e&&e.name=='AbortError'){btn.removeAttribute('disabled');return}throw e}}
-  else files.forEach(f=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)});
-  STG.set(id,2);drawSend()}
- catch(e){btn.removeAttribute('disabled');e&&toast(e.message)}}
+  if(navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files})}catch(e){if(e&&e.name=='AbortError')return;throw e}toast('Shared. Pick WhatsApp and the same chat.')}
+  else{files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},i*350));
+   toast(`${files.length} file${files.length>1?'s':''} saved to your Downloads folder. Drag ${files.length>1?'them':'it'} into the chat.`)}
+  STG.set(id,2);drawIf()}
+ catch(e){e&&toast(e.message)}
+ finally{if(btn.isConnected){btn.innerHTML=old;btn.removeAttribute('disabled')}}}
 
 async function mark(id,o){const i=Q.findIndex(x=>String(x.id)==id),it=Q[i];
  if(i>=0){Q.splice(i,1);if(o=='messaged')QM.used++;if(qi>=Q.length)qi=0;put('queue',QM);drawSend()}
@@ -570,15 +579,48 @@ async function mark(id,o){const i=Q.findIndex(x=>String(x.id)==id),it=Q[i];
 /* ============ SETTINGS ============ */
 const setSkel=()=>`${sk('120px','13px','display:block;margin-bottom:8px')}${sk('100%','120px','display:block;margin-bottom:14px;border-radius:12px')}${sk('90px','13px','display:block;margin-bottom:8px')}${sk('100%','44px','display:block;margin-bottom:14px;border-radius:12px')}<div class="tools" style="margin:0">${sk('120px','42px','border-radius:12px')}${sk('100px','42px','border-radius:12px')}</div>`;
 function shSet(){$('#p-set').innerHTML=head('Settings','Message, media and daily limit')+`<div class="glass pad" id="sf">${setSkel()}</div><div class="glass pad" id="mf" style="margin-top:14px">${setSkel()}</div><div class="glass pad" id="wf" style="margin-top:14px">${setSkel()}</div><div class="glass pad" id="pf" style="margin-top:14px">${setSkel()}</div>`}
-const loadSet=()=>{paintConn();pollStatus();loadPipe();swr('media',{ttl:20000,render:fillMedia}).catch(()=>{});return swr('settings',{ttl:60000,render:fillSet})};
+const loadSet=()=>{paintConn();pollStatus();loadPipe();if(!C.has('queue'))fetchC('queue').then(()=>updTpl()).catch(()=>{});swr('media',{ttl:20000,render:fillMedia}).catch(()=>{});return swr('settings',{ttl:60000,render:fillSet})};
 const loadSend=()=>{SJV=-1;poller(pollSend,SMS,true);pollStatus();
  swr('media',{ttl:20000,render:fillMedia}).catch(()=>{});
  return swr('queue',{ttl:6000,render:onQueue})};
 const VARS=[['name','Business name'],['type','Business type, e.g. gym'],['category','Same as {type}'],['phone','Phone number'],['address','Address'],['rating','Google rating'],['reviews','Number of reviews'],['website','Website'],['date','Today, e.g. 15 Nov']];
-function fillSet(s){const tp=$('#tp'),dl=$('#dl');if(tp&&dl&&(tp.value!==tp.defaultValue||dl.value!==dl.defaultValue))return;paint($('#sf'),`<div class="field"><label>Message template</label><textarea id="tp" rows="5">${esc(s.template)}</textarea><div class="chips">${VARS.map(v=>`<button data-a="ins" data-v="${v[0]}" title="${esc(v[1])}">{${v[0]}}</button>`).join('')}</div><details style="margin-top:8px"><summary class="sub" style="cursor:pointer">What do these do?</summary><ul class="sub" style="margin:6px 0 0;padding-left:18px">${VARS.map(v=>`<li><b>{${v[0]}}</b> ${esc(v[1])}</li>`).join('')}</ul></details><p class="sub" style="margin:8px 0 0">Tap one to insert it. A variable with no data becomes blank. Say who you are and add a reply STOP opt-out.</p></div><div class="field"><label>Daily limit</label><input id="dl" type="number" min="1" max="100" value="${esc(s.daily_limit)}"></div><div class="tools" style="margin:0"><button class="btn" data-a="savset">Save changes</button><button class="btn soft" data-a="logout">${ic('log-out')}Log out</button></div>`)}
+const PRE=[
+ ['Friendly','Hi {name}! 👋 This is [Your name]. I came across your {type} business and liked what I saw. I help local businesses get more customers online. Would you be open to a quick chat?\n\nReply STOP to opt out.'],
+ ['Short','Hi {name}, this is [Your name]. Quick question about your {type} business: can I share an idea that may bring you more customers?\n\nReply STOP to opt out.'],
+ ['Use rating','Hi {name}, I saw your {rating}-star rating from {reviews} reviews on Google. Great work! I am [Your name] and I have an idea to help you get even more customers. Interested?\n\nReply STOP to opt out.']];
+const TSAMPLE={name:'Ravi Realty',type:'real estate',category:'real estate',phone:'98450 12345',address:'Indiranagar, Bengaluru',rating:'4.5',reviews:'120',website:'ravirealty.in'},KNOWN=VARS.map(v=>v[0]);let TPS='sample';
+const tplDate=()=>new Date().toLocaleDateString([],{day:'numeric',month:'short'}),renderTpl=(t,v)=>t.replace(/\{(\w+)\}/g,(m,k)=>k in v?String(v[k]??''):m);
+function tplVars(){const q=(C.get('queue')||{}).d,l=TPS=='lead'&&q&&q.items&&q.items[0];
+ return l?{name:l.name,type:l.category,category:l.category,phone:l.phone,address:l.address,rating:l.rating,reviews:l.reviews,website:l.website,date:tplDate(),_lead:1}:Object.assign({date:tplDate()},TSAMPLE)}
+function updTpl(){const tp=$('#tp');if(!tp)return;const t=tp.value,v=tplVars(),n=mon().length;
+ document.querySelectorAll('#tseg button').forEach(b=>b.classList.toggle('on',b.dataset.v==TPS));
+ $('#tcnt').textContent=t.length+' characters';
+ const dl=$('#dl');$('#tdirty').textContent=tp.value!==tp.defaultValue||(dl&&dl.value!==dl.defaultValue)?'Unsaved changes':'';
+ const note=TPS=='lead'?(v._lead?'Preview for '+esc(v.name):'No lead in the queue yet. Showing a sample.'):'Preview with a sample business';
+ paint($('#tpv'),`<div class="sub" style="margin-bottom:6px">${note}</div>${t.trim()?`<div class="bubble">${esc(renderTpl(t,v))}</div>`:'<div class="sub">Type a message to see the preview.</div>'}${n?`<p class="sub" style="text-align:right;margin:6px 0 0">+ ${n} media file${n>1?'s':''} sent with it</p>`:''}`,1);
+ const ck=[],unk=[...new Set([...t.matchAll(/\{(\w+)\}/g)].map(m=>m[1]))].filter(k=>!KNOWN.includes(k));
+ if(!t.trim())ck.push([1,'The message is empty.']);
+ else{if(!/\{name\}/.test(t))ck.push([1,'Add {name} so the message feels personal.']);
+  if(!/\bstop\b/i.test(t))ck.push([1,'Add a "Reply STOP to opt out" line. It protects your number.']);
+  if(/\[[^\]]+\]/.test(t))ck.push([1,'Replace the [bracketed] part, for example with your name.']);
+  if(unk.length)ck.push([1,'Unknown variable: '+unk.map(k=>'{'+k+'}').join(', ')+'. It will not be filled in.']);
+  if(t.length>600)ck.push([1,'This is long. Messages under 600 characters get more replies.']);
+  if(!ck.length)ck.push([0,'Looks good.'])}
+ paint($('#tchk'),ck.map(c=>`<div class="sub" style="display:flex;gap:8px;margin-top:6px;color:${c[0]?'#9a5b12':'#3f7a44'}">${ic(c[0]?'alert-triangle':'check-circle-2')}<span>${esc(c[1])}</span></div>`).join(''))}
+function fillSet(s){const tp=$('#tp'),dl=$('#dl');if(tp&&dl&&(tp.value!==tp.defaultValue||dl.value!==dl.defaultValue))return;
+ paint($('#sf'),`<div class="field"><label>Message template</label>
+ <div class="chips" style="margin:0 0 10px"><span class="sub" style="align-self:center">Start from:</span>${PRE.map((p,i)=>`<button data-a="tpre" data-i="${i}">${p[0]}</button>`).join('')}</div>
+ <textarea id="tp" rows="6">${esc(s.template)}</textarea>
+ <div class="sub" style="display:flex;justify-content:space-between;margin-top:6px"><span id="tcnt"></span><span id="tdirty" style="color:var(--tom)"></span></div>
+ <div class="lbl" style="margin:12px 0 6px">Tap to insert</div><div class="chips" style="margin-top:0">${VARS.map(v=>`<button data-a="ins" data-v="${v[0]}" title="${esc(v[1])}">{${v[0]}}</button>`).join('')}<button data-a="tstop">+ STOP line</button></div>
+ <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">What do these do?</summary><ul class="sub" style="margin:6px 0 0;padding-left:18px">${VARS.map(v=>`<li><b>{${v[0]}}</b> ${esc(v[1])}</li>`).join('')}</ul></details>
+ <div class="lbl">Preview</div><div class="seg" id="tseg"><button data-a="tps" data-v="sample">Sample business</button><button data-a="tps" data-v="lead">First lead in queue</button></div>
+ <div id="tpv"></div><div id="tchk" style="margin-bottom:4px"></div></div>
+ <div class="field"><label>Daily limit</label><input id="dl" type="number" min="1" max="100" value="${esc(s.daily_limit)}"><p class="sub" style="margin:6px 0 0">New or rarely used numbers are safer at 20 to 40 a day.</p></div>
+ <div class="tools" style="margin:0"><button class="btn" data-a="savset">Save changes</button><button class="btn soft" data-a="logout">${ic('log-out')}Log out</button></div>`);updTpl()}
 async function saveSet(btn){const t=$('#tp').value,d=$('#dl').value;btn.setAttribute('disabled','');
  try{await api('settings','PUT',{template:t,daily_limit:d});const c=C.get('settings');c&&put('settings',Object.assign({},c.d,{template:t,daily_limit:d}));
-  $('#tp').defaultValue=t;$('#dl').defaultValue=d;stale(/^queue/);toast('Saved')}
+  $('#tp').defaultValue=t;$('#dl').defaultValue=d;stale(/^queue/);updTpl();toast('Saved')}
  catch(e){e&&toast(e.message)}finally{btn.removeAttribute('disabled')}}
 
 /* ----- WhatsApp connection panel (driven by the shared status) ----- */
@@ -587,11 +629,12 @@ function paintConn(){const b=$('#wf');if(!b)return;
  if(!WST.loaded){paint(b,`${sk('160px','13px','display:block;margin-bottom:10px')}${sk('100%','44px','display:block;border-radius:12px')}`,1);return}
  const s=WST,ok=s.status=='ready',sy=s.sync,
  body=ok?`<p class="sub" style="margin:0">Connected${s.mem_mb?' · server memory '+esc(Math.round(s.mem_mb))+' MB':''}.</p>`
+  :s.status=='disabled'?`<p class="sub" style="margin:0">WhatsApp is turned off on this server, so auto-send, backup and reset are unavailable. Manual sending from the Send tab still works. Enable WhatsApp in the server configuration and restart to use it.</p>`
   :s.status=='error'?`<div class="err" style="margin:0">${esc(s.err||'WhatsApp failed to start')}</div>`
   :`<p class="sub" style="margin:0 0 10px">${s.status=='qr'?'On your phone open WhatsApp, Linked devices, then scan this.':'Starting... this is what the server sees:'}</p>${s.qr?`<img src="${esc(s.qr)}" alt="" style="width:${s.status=='qr'?240:'100%'}px;max-width:100%;border-radius:12px">`:''}`,
  bk=!sy?'No backup made since this server started':sy.ok?'Last backup to storage: '+hhmm(sy.at):'Last backup failed: '+esc(sy.err||'unknown error');
- paint(b,`<label>WhatsApp connection</label>${body}<p class="sub" style="margin:10px 0 0">${bk}</p>${BUSY?`<div class="wl" style="margin-top:10px">${esc(busyMsg())}</div>`:''}
- <div class="tools" style="margin:14px 0 0"><button class="btn soft" data-a="wsync" ${ok&&!BUSY&&!WB?'':'disabled'}>${ic('database')}${WB==1?'Backing up...':'Back up now'}</button><button class="btn ghost" data-a="wreset" ${BUSY||WB?'disabled':''}>${ic('log-out')}Log out and reset</button></div>`)}
+ paint(b,`<label>WhatsApp connection</label>${body}${s.status=='disabled'?'':`<p class="sub" style="margin:10px 0 0">${bk}</p>`}${BUSY?`<div class="wl" style="margin-top:10px">${esc(busyMsg())}</div>`:''}
+ <div class="tools" style="margin:14px 0 0"><button class="btn soft" data-a="wsync" ${ok&&!BUSY&&!WB?'':'disabled'}>${ic('database')}${WB==1?'Backing up...':'Back up now'}</button><button class="btn ghost" data-a="wreset" ${BUSY||WB||s.status=='disabled'?'disabled':''}>${ic('log-out')}Log out and reset</button></div>`)}
 async function waSync(){if(WB||BUSY||WS!='ready')return;WB=1;paintConn();
  try{await api('wa/sync','POST');toast('Backup started');setTimeout(pollStatus,3000)}
  catch(e){e&&toast(e.message);pollStatus()}finally{WB=0;paintConn()}}
@@ -639,15 +682,18 @@ const A={
  adgo:()=>adGo(),admore:()=>{AD.res=null;adBuild()}};
 Object.assign(A,{
  wa:()=>{const l=Q[qi];if(l){STG.set(l.id,Math.max(1,stg(l.id)));setTimeout(drawSend,500)}},
- media:e=>shareMedia(e.dataset.id,e),auto:e=>startSend({ids:[e.dataset.id]}),sendall:()=>openSendAll(),
+ media:e=>shareMedia(e.dataset.id,e),auto:e=>{if(e.closest('dialog')){closeDlg(D2);go('send')}startSend({ids:[e.dataset.id]})},sendall:()=>openSendAll(),
  sendgo:()=>{const n=+$('#san').value;closeDlg(D2);startSend({n})},stopsend:()=>stopSend(),
  rmmedia:e=>rmMedia(e.dataset.id),
- front:async e=>{try{await api('leads/'+enc(e.dataset.id)+'/front','POST');afterMut();await swr('queue',{ttl:0,render:onQueue});toast('Moved to front')}catch(x){x&&toast(x.message)}},
+ tpre:e=>{const tp=$('#tp');if(!tp)return;if(tp.value.trim()&&tp.value!==tp.defaultValue&&!confirm('Replace your unsaved changes with this template?'))return;tp.value=PRE[+e.dataset.i][1];tp.focus();updTpl()},
+ tstop:()=>{const tp=$('#tp');if(!tp)return;if(/\bstop\b/i.test(tp.value))return toast('A STOP line is already there');tp.value=tp.value.replace(/\s+$/,'')+'\n\nReply STOP to opt out.';updTpl()},
+ tps:e=>{TPS=e.dataset.v;updTpl()},
+ copytxt:async e=>{const c=C.get('leads/'+enc(e.dataset.id)),lk=(c&&c.d&&c.d.link)||'';let t='';try{t=decodeURIComponent(lk.split('text=')[1]||'')}catch(x){}if(!t)return toast('No message to copy');try{await navigator.clipboard.writeText(t);toast('Message copied')}catch(x){toast('Could not copy. Your browser blocked it.')}},front:async e=>{try{await api('leads/'+enc(e.dataset.id)+'/front','POST');afterMut();await swr('queue',{ttl:0,render:onQueue});toast('Moved to front of the queue')}catch(x){x&&toast(x.message)}},
  rfilt:()=>{RF=RF?0:1;RD&&fillRun(RD)},wsync:()=>waSync(),wreset:()=>waReset(),psave:e=>savePipe(e),
  mtog:e=>{const m=ML.find(x=>x.id==e.dataset.id);m&&togMedia(m.id,!m.on)},
  mprev:e=>{const m=ML.find(x=>x.id==e.dataset.id);if(!m)return;const u='/api/media/'+enc(m.id)+'/file';
   showSheet(GRAB+`<div style="border-radius:14px;overflow:hidden;background:#000">${m.type.startsWith('video')?`<video src="${u}" controls playsinline style="width:100%;max-height:60vh"></video>`:`<img src="${u}" alt="" style="width:100%;max-height:60vh;object-fit:contain">`}</div><p class="sub" style="margin:10px 0">${esc(m.name)} · ${mb(m.size)}</p><button class="btn soft block" data-a="close">Close</button>`,0);openDlg(D2)},
- ins:e=>{const t=$('#tp');if(!t)return;const s=t.selectionStart??t.value.length;t.setRangeText('{'+e.dataset.v+'}',s,t.selectionEnd??s,'end');t.focus()}});
+ ins:e=>{const t=$('#tp');if(!t)return;const s=t.selectionStart??t.value.length;t.setRangeText('{'+e.dataset.v+'}',s,t.selectionEnd??s,'end');t.focus();updTpl()}});
 document.addEventListener('change',e=>{const t=e.target;
  if(t.id=='mfile'){const f=[...t.files];t.value='';upMedia(f)}});
 document.addEventListener('toggle',e=>{if(e.target.id=='mdet')MO=e.target.open},true);
@@ -658,13 +704,13 @@ document.addEventListener('change',e=>{const t=e.target;
  else if(t.id=='adskip'){AD.skip=t.checked?1:0;adUpdate()}});
 document.addEventListener('input',e=>{const t=e.target;
  if(t.closest('#adc')){const row=t.closest('.brow');if(t.dataset.f&&row){const r=AD.rows[+row.dataset.i];if(r)r[t.dataset.f]=t.value;adSched()}else if(t.id=='adbulk'){AD.bulk=t.value;adSched()}}
- else if(t.closest('#p-find'))keep()});
+ else if(t.closest('#p-find'))keep();else if(t.id=='tp'||t.id=='dl')updTpl()});
 
 /* ============ MEDIA ============ */
 const MT={'image/jpeg':5,'image/png':5,'image/webp':5,'video/mp4':16,'video/3gpp':16},MAXF=10,MAXT=100*1048576;let MU=0;
 const mb=n=>(n/1048576).toFixed(1)+' MB',setMC=fn=>{const c=C.get('media');c&&put('media',fn(c.d))};
 let ML=[],MO=0;const mon=()=>ML.filter(m=>m.on);
-function fillMedia(L){ML=L||[];if(tab=='send'&&QM.loaded)drawSend();const el=$('#mf');if(!el||MU)return;
+function fillMedia(L){ML=L||[];if(tab=='send'&&QM.loaded)drawSend();if(tab=='set')updTpl();const el=$('#mf');if(!el||MU)return;
  const tot=ML.reduce((a,m)=>a+m.size,0);
  paint(el,`<details id="mdet" ${MO?'open':''}><summary class="msum">${ic('images')}<b>Media</b><span class="sub">${ML.length?`${mon().length} of ${ML.length} on · ${mb(tot)}`:'None yet'}</span><span class="chev" style="display:block;margin-left:auto">${ic('chevron-down')}</span></summary>
  <div class="mg">${ML.map(m=>`<div class="mt ${m.on?'':'off'}" data-a="mprev" data-id="${esc(m.id)}">${m.type.startsWith('video')?`<div class="vd">${ic('play-circle')}</div>`:`<img loading="lazy" src="/api/media/${esc(m.id)}/file" alt="">`}<span class="cb ${m.on?'on':''}" data-a="mtog" data-id="${esc(m.id)}"></span><button class="x" data-a="rmmedia" data-id="${esc(m.id)}" aria-label="Delete">${ic('x')}</button></div>`).join('')}
