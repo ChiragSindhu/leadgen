@@ -1,9 +1,15 @@
-"""Local lead pipeline v1.2: Google Places (New) + OpenStreetMap + manual/JSON -> Supabase Postgres."""
+"""Local lead pipeline v1.3: orchestration + database logic only.
+Sources live in their own modules and know nothing about the database:
+    google_source.py  (Places API New)   osm_source.py  (Overpass)   maps_scraper.py  (Playwright, run as a subprocess)
+Storage: Supabase Postgres."""
 import os, sys, threading, json, re, time, hashlib, subprocess, tempfile, datetime as dt
 from urllib.parse import quote
-import requests, phonenumbers
+import phonenumbers
 import psycopg2, psycopg2.extras
 import queue, shutil, psutil
+
+from google_source import fetch_google, GoogleError           # noqa: F401  (re-exported for callers)
+from osm_source import fetch_osm, OSMUnavailable, OSM_TAGS, osm_selectors   # noqa: F401
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 def _load_env():   # every entry point (server, bot, scraper) reads .env
@@ -15,8 +21,8 @@ def _load_env():   # every entry point (server, bot, scraper) reads .env
 _load_env()
 DATABASE_URL = os.getenv("DATABASE_URL")   # Supabase: Connect -> Direct/Session pooler -> connection string
 LAST_WARNING = None
+LAST_OSM = {}
 REGION = "IN"  # default country for numbers without a +code
-UA = {"User-Agent": "leadpipe/1.2 (personal lead tool)"}
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 WATCH = ["name", "phone", "website", "email", "address", "status"]   # changes are logged
 COLS = ["id", "source", "name", "category", "address", "lat", "lng", "phone", "is_mobile",
@@ -125,109 +131,6 @@ def score(r):
     s += 5 if (r.get("reviews") or 0) >= 5 else 0
     return s + 10   # +10 operating/active
 
-# ---------- sources ----------
-def _google_error(status, e):
-    st, msg = e.get("status", ""), e.get("message", "Google API error")
-    if st == "RESOURCE_EXHAUSTED" or status == 429: return f"Google quota/rate limit exceeded: {msg}"
-    if st == "PERMISSION_DENIED" or status == 403:
-        return f"Google refused the request (enable 'Places API (New)', enable billing, check key restrictions): {msg}"
-    if "API key" in msg or st == "UNAUTHENTICATED": return f"Google API key invalid: {msg}"
-    return f"Google API error {status} {st}: {msg}"
-
-def fetch_google(key, query, lat, lng, radius_m, max_pages=3, counter=None):
-    global LAST_WARNING
-    if not key: raise RuntimeError("Google API key missing")
-    mask = ("places.id,places.displayName,places.formattedAddress,places.location,"
-            "places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,"
-            "places.googleMapsUri,places.businessStatus,places.rating,places.userRatingCount,nextPageToken")
-    body = {"textQuery": query, "pageSize": 20, "locationBias": {"circle": {
-        "center": {"latitude": lat, "longitude": lng}, "radius": float(min(radius_m, 50000))}}}
-    out = []
-    for pg in range(max_pages):
-        resp = None
-        for attempt in range(3):
-            try:
-                resp = requests.post("https://places.googleapis.com/v1/places:searchText", json=body, timeout=30,
-                                     headers={"X-Goog-Api-Key": key, "X-Goog-FieldMask": mask})
-            except requests.RequestException as e:
-                if attempt == 2: raise RuntimeError(f"Google API network error: {e}")
-                time.sleep(2 * (attempt + 1)); continue
-            if counter is not None: counter[0] += 1
-            if resp.status_code in (500, 502, 503, 504) and attempt < 2: time.sleep(2 ** (attempt + 1)); continue
-            break
-        try: r = resp.json()
-        except ValueError: raise RuntimeError(f"Google API returned non-JSON (HTTP {resp.status_code}): {resp.text[:120]!r}")
-        if "error" in r:
-            msg = _google_error(resp.status_code, r["error"])
-            if out: LAST_WARNING = f"Google page {pg + 1} failed, kept earlier pages: {msg}"; break
-            raise RuntimeError(msg)
-        for p in r.get("places", []):
-            loc = p.get("location", {})
-            out.append(dict(id="g:" + p["id"], source="google", name=p.get("displayName", {}).get("text"),
-                category=query, address=p.get("formattedAddress"), lat=loc.get("latitude"), lng=loc.get("longitude"),
-                phone=p.get("internationalPhoneNumber") or p.get("nationalPhoneNumber"),
-                website=p.get("websiteUri"), maps_url=p.get("googleMapsUri"), rating=p.get("rating"),
-                reviews=p.get("userRatingCount"), status=p.get("businessStatus")))
-        if not r.get("nextPageToken"): break
-        body["pageToken"] = r["nextPageToken"]; time.sleep(1.5)
-    return out
-
-class OSMUnavailable(RuntimeError): pass
-LAST_OSM = {}
-OSM_TAGS = {
-    "real estate": ['["office"~"^(estate_agent|real_estate)$"]', '["shop"="estate_agent"]', '["office"="property_management"]'],
-    "pg": ['["tourism"~"^(hostel|guest_house)$"]', '["amenity"="boarding_house"]', '["building"="dormitory"]',
-           '["name"~"(^|[^A-Za-z])(PG|paying guest)([^A-Za-z]|$)",i]'],
-    "hostel": ['["tourism"="hostel"]'], "gym": ['["leisure"="fitness_centre"]'],
-    "clinic": ['["amenity"~"^(clinic|doctors|dentist)$"]'], "salon": ['["shop"~"^(hairdresser|beauty)$"]'],
-    "restaurant": ['["amenity"="restaurant"]'], "school": ['["amenity"="school"]'],
-    "cafe": ['["amenity"="cafe"]'], "pharmacy": ['["amenity"="pharmacy"]'], "coaching": ['["amenity"~"^(college|training)$"]']}
-OSM_ALIASES = {"real estate agent": "real estate", "estate agent": "real estate", "property": "real estate", "realtor": "real estate",
-               "property dealer": "real estate", "paying guest": "pg", "fitness": "gym", "doctor": "clinic", "beauty parlour": "salon"}
-OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter",
-            "https://overpass.kumi.systems/api/interpreter", "https://overpass.openstreetmap.fr/api/interpreter",
-            "https://maps.mail.ru/osm/tools/overpass/api/interpreter"]
-
-def osm_selectors(category):
-    k = category.lower().strip(); k = OSM_ALIASES.get(k, k)
-    if k in OSM_TAGS: return OSM_TAGS[k]
-    m = re.fullmatch(r"([\w:]+)=([\w:|]+)", category.strip())      # raw tag, e.g. shop=bakery or shop=a|b
-    if m: return [f'["{m[1]}"~"^({m[2]})$"]' if "|" in m[2] else f'["{m[1]}"="{m[2]}"]']
-    for key in OSM_TAGS:
-        if len(key) > 3 and key in k: return OSM_TAGS[key]
-    return None
-
-def fetch_osm(category, lat, lng, radius_m):
-    sels = osm_selectors(category)
-    if not sels: raise RuntimeError(f"OSM: unknown category '{category}'. Use one of {list(OSM_TAGS)} or key=value (e.g. shop=bakery)")
-    around = f"(around:{int(radius_m)},{lat},{lng})"
-    q = "[out:json][timeout:60];(" + "".join(f"nwr{s}{around};" for s in sels) + ");out center tags;"
-    els, last, host = None, "", ""
-    for url in OVERPASS:
-        host = url.split("/")[2]
-        for attempt in range(2):
-            try:
-                resp = requests.post(url, data={"data": q}, headers=UA, timeout=90)
-                js = resp.json() if resp.status_code == 200 else {}
-                if resp.status_code == 200 and "elements" in js and not (js.get("remark", "").lower().startswith("runtime error") and not js["elements"]):
-                    els = js["elements"]; break
-                last = f"{host}: HTTP {resp.status_code} {(js.get('remark') or resp.text)[:120]!r}"
-            except Exception as e: last = f"{host}: {type(e).__name__}: {str(e)[:120]}"
-            time.sleep(2 * (attempt + 1))
-        if els is not None: break
-    if els is None: raise OSMUnavailable(f"All {len(OVERPASS)} Overpass servers failed. Last error -> {last}")
-    out, unnamed = [], 0
-    for e in els:
-        t = e.get("tags", {}); c = e.get("center", e)
-        if not (t.get("name") or "").strip(): unnamed += 1; continue
-        out.append(dict(id=f"o:{e['type']}{e['id']}", source="osm", name=t["name"], category=category,
-            address=t.get("addr:full") or " ".join(filter(None, [t.get("addr:housenumber"), t.get("addr:street"), t.get("addr:city")])) or None,
-            lat=c.get("lat"), lng=c.get("lon"), phone=t.get("phone") or t.get("contact:phone") or t.get("contact:mobile"),
-            website=t.get("website") or t.get("contact:website"), email=t.get("email") or t.get("contact:email"),
-            maps_url=f"https://www.openstreetmap.org/{e['type']}/{e['id']}", status="active"))
-    LAST_OSM.update(mirror=host, raw=len(els), unnamed=unnamed)
-    return out
-
 # ---------- save + change detection ----------
 def save_row(c, r, ts):
     """Insert or update one lead. Returns 'added' | 'updated' | 'same' | 'skipped'."""
@@ -267,6 +170,7 @@ def google_used(c):
     return c.execute("SELECT COALESCE(SUM(calls),0) FROM runs WHERE source='google' AND at LIKE ?", (m,)).fetchone()[0]
 
 def run(query, lat, lng, radius_m, source="google", key=None, cap=900, max_pages=3, location=None, limit=None, on_progress=None):
+    """Google / OSM run: fetch via the source module, then persist. All DB + bookkeeping lives here."""
     global LAST_WARNING
     LAST_WARNING = None
     c = db(); counter = [0]; rows = []; err = None; added = changed = nocontact = saved = 0
@@ -282,9 +186,13 @@ def run(query, lat, lng, radius_m, source="google", key=None, cap=900, max_pages
             if source == "google":
                 used = google_used(c)
                 if used + max_pages > cap: raise RuntimeError(f"Monthly Google call cap reached ({used}/{cap}). Raise the cap or use another source.")
-                rows = fetch_google(key, query, lat, lng, radius_m, max_pages, counter)
-                if LAST_WARNING: ev("warn", LAST_WARNING[:250])
-            else: rows = fetch_osm(query, lat, lng, radius_m)
+                try: g = fetch_google(key, query, lat, lng, radius_m, max_pages)
+                except GoogleError as e: counter[0] = e.calls; raise      # failed calls are still billable
+                rows, counter[0] = g.rows, g.calls
+                if g.warning: LAST_WARNING = g.warning; ev("warn", g.warning[:250])
+            else:
+                o = fetch_osm(query, lat, lng, radius_m); rows = o.rows
+                LAST_OSM.update(mirror=o.mirror, raw=o.raw, unnamed=o.unnamed)
         except OSMUnavailable as e: err = e; ev("error", f"OSM UNAVAILABLE (not a zero-result): {str(e)[:230]}")
         except Exception as e: err = e; ev("error", str(e)[:250])
         if not err:
@@ -370,7 +278,7 @@ def delete_leads(c, ids):
         c.execute("DELETE FROM leads WHERE id=?", (i,)); c.execute("DELETE FROM changes WHERE lead_id=?", (i,))
     c.commit()
 
-# ---------- Google Maps scraper as a source (runs maps_scraper.py as a subprocess: safe on Windows/Streamlit) ----------
+# ---------- Google Maps scraper as a source (maps_scraper.py runs as a subprocess: safe on Windows/Streamlit) ----------
 def scrape_id(it):
     m = re.search(r"!1s(0x[0-9a-f]+:0x[0-9a-f]+)", it.get("maps_url") or "")
     return "s:" + (m.group(1) if m else hashlib.md5(f"{it.get('name')}|{it.get('address')}".encode()).hexdigest()[:12])
@@ -378,9 +286,13 @@ def scrape_id(it):
 # ---------- scraper jobs: queue in `runs`, executed by worker.py (or inline for local dev) ----------
 SCRAPER = os.getenv("LEADPIPE_SCRAPER", os.path.join(HERE, "maps_scraper.py"))
 MAX_ATTEMPTS = int(os.getenv("SCRAPE_MAX_ATTEMPTS", "3"))
-IDLE_TIMEOUT = int(os.getenv("SCRAPE_IDLE_TIMEOUT", "150"))       # seconds without any scraper output
+IDLE_TIMEOUT = int(os.getenv("SCRAPE_IDLE_TIMEOUT", "300"))       # seconds without scraper output (0.1 CPU: one slow page can take >2 min)
 WORKER_MODE = os.getenv("WORKER_MODE", "inline")                  # inline (local) | remote (Render web: wait for worker)
+EXIT_BUSY = 5                                                     # maps_scraper.py: another scraper already running
 STOP = threading.Event()
+# Process-level half of the "one scraper at a time" rule (the scraper's own file lock is the cross-process half).
+# Re-entrant so run_scrape() can hold it across claim_job + execute_job.
+_JOB_SLOT = threading.RLock()
 
 def kill_tree(proc, grace=5):
     """Terminate the scraper AND every Chromium child, then SIGKILL stragglers. Cross-platform."""
@@ -438,6 +350,10 @@ def reap_stale(max_age=120):
     c.commit(); c.close(); return n
 
 def execute_job(job, on_progress=None):
+    with _JOB_SLOT:                      # never two scrapes (= two Chromiums) in this process
+        return _execute_job(job, on_progress)
+
+def _execute_job(job, on_progress=None):
     rid, wid = job["id"], job["worker_id"]
     p = json.loads(job["params"] or "{}"); query, location, limit = p["query"], p["location"], int(p.get("limit") or 30)
     c = db()
@@ -511,6 +427,10 @@ def execute_job(job, on_progress=None):
     attempts = job["attempts"] or 1
     if reason == "shutdown": status, error, fin = "queued", None, None; ev("warn", "Worker shutting down: job re-queued, will resume (no results lost)")
     elif t["blocked"]: status, error, fin = ("partial" if t["fetched"] else "failed"), t["err"], now()
+    elif rc == EXIT_BUSY and not reason:
+        status, error, fin = "queued", None, None       # the single scraper slot was taken: not a failed attempt
+        c.execute("UPDATE runs SET attempts=GREATEST(COALESCE(attempts,1)-1,0) WHERE id=?", (rid,))
+        ev("warn", "Another scraper process holds the single scraper slot; re-queued without using an attempt")
     elif reason or rc != 0:
         error = reason or f"Scraper exited with code {rc}"
         if attempts < MAX_ATTEMPTS: status, fin = "queued", None; ev("warn", f"{error}. Re-queued for resume ({attempts}/{MAX_ATTEMPTS} attempts used)")
@@ -539,8 +459,9 @@ def run_scrape(query, location, limit=30, timeout=None, on_progress=None):
     LAST_WARNING = None
     rid = enqueue_scrape(query, location, limit)
     if WORKER_MODE != "remote":
-        job = claim_job(f"inline:{os.getpid()}", rid)
-        if job: execute_job(job, on_progress)
+        with _JOB_SLOT:                  # claim and execute under one hold so a waiting job is never 'running' without a heartbeat
+            job = claim_job(f"inline:{os.getpid()}", rid)
+            if job: execute_job(job, on_progress)
     r = wait_run(rid, on_progress)
     if r["status"] == "failed": raise RuntimeError(r["error"] or "Scrape failed")
     LAST_WARNING = r["error"]
@@ -566,7 +487,7 @@ def wa_link(phone, text=""):
     return "https://wa.me/" + phone.lstrip("+") + ("?text=" + quote(text) if text else "")
 
 def sendable(c, n, exclude=()):
-    rows = c.execute(f"SELECT * FROM leads WHERE {SENDABLE} ORDER BY score DESC, first_seen LIMIT ?", (n + len(exclude),)).fetchall()
+    rows = c.execute(f"SELECT * FROM leads WHERE {SENDABLE} ORDER BY priority DESC, last_seen DESC, score DESC, first_seen DESC, id DESC LIMIT ?", (n + len(exclude),)).fetchall()
     return [r for r in rows if r["id"] not in exclude][:n]
 
 def sent_today(c):
