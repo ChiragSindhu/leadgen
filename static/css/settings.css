@@ -1,0 +1,13 @@
+/* message templates */
+.tph{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.tlist{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.titem{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;border:1px solid rgba(63,77,55,.1);background:rgba(255,255,255,.5);cursor:pointer;transition:.15s}
+.titem:hover{background:rgba(255,255,255,.85)}
+.titem.sel{border-color:var(--sage);background:#fff;box-shadow:0 0 0 3px rgba(125,143,110,.16)}
+.titem .t{flex:1;min-width:0}.titem b{display:block;font-weight:600;font-size:14px}
+.titem small{display:block;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tradio{width:18px;height:18px;border-radius:50%;border:2px solid rgba(63,77,55,.3);flex:none;display:grid;place-items:center}
+.tradio.on{border-color:var(--sd)}.tradio.on::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--sd)}
+.ted{border-top:1px solid rgba(63,77,55,.1);padding-top:16px}
+.tsw{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.tsw label{margin:0;white-space:nowrap}.tsw select{flex:1;min-width:0}

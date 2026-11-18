@@ -1,0 +1,10 @@
+.msum{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}.msum::-webkit-details-marker{display:none}
+details[open]>.msum .chev svg{transform:rotate(180deg)}
+.mg{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:14px}
+.mt{position:relative;aspect-ratio:1;border-radius:14px;overflow:hidden;background:var(--sl);cursor:pointer;display:grid;place-items:center;color:var(--sd)}
+.mt img{width:100%;height:100%;object-fit:cover;display:block}
+.mt.off img,.mt.off .vd{opacity:.4}
+.mt .vd svg{width:30px;height:30px}
+.mt .cb{position:absolute;left:6px;bottom:6px}
+.mt .x{all:unset;cursor:pointer;position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;background:rgba(35,42,31,.6);color:#fff;display:grid;place-items:center}.mt .x svg{width:14px;height:14px}
+.mt.add{border:2px dashed rgba(63,77,55,.25);background:transparent}

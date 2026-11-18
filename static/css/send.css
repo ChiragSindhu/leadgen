@@ -1,0 +1,18 @@
+.focus{padding:24px;text-align:left}.focus h2{font-size:24px;margin:10px 0 4px;letter-spacing:-.02em}.meta{display:flex;gap:8px;align-items:center;color:var(--mut);font-size:14px;margin:4px 0}
+.preview{background:rgba(255,255,255,.7);border-radius:14px;padding:14px;margin:16px 0;font-size:14px;color:var(--ink);white-space:pre-wrap}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.acts .btn.block:first-child{grid-column:1/-1}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:rgba(255,255,255,.55);backdrop-filter:blur(14px);margin-bottom:14px}
+.seg button{all:unset;flex:1;text-align:center;padding:9px 4px;border-radius:11px;font-weight:600;font-size:13px;cursor:pointer;color:var(--mut)}.seg .on{background:#fff;color:var(--sd);box-shadow:0 1px 5px rgba(40,55,30,.14)}
+.pager{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.pager .btn{width:40px;padding:0}.pager b{font-size:14px}
+.who{display:flex;gap:14px;align-items:center}.who .av{width:52px;height:52px;font-size:20px}.who h2{margin:0;font-size:21px;letter-spacing:-.02em}
+.bubble{background:#e4ecd9;border-radius:18px 18px 4px 18px;padding:12px 14px;font-size:14px;white-space:pre-wrap;margin-left:auto;max-width:94%}
+.steps{display:flex;margin:20px 0 14px}.stp{flex:1;text-align:center;font-size:12px;color:var(--mut);font-weight:500;position:relative}
+.stp .n{width:30px;height:30px;border-radius:50%;background:var(--sl);color:var(--sd);display:grid;place-items:center;margin:0 auto 6px;font-weight:700;font-size:13px}
+.stp.on{color:var(--ink);font-weight:600}.stp.on .n{background:var(--sd);color:#fff}.stp.ok .n{background:var(--sage);color:#fff}
+.big{height:52px;font-size:16px;border-radius:14px}.hint{text-align:center;color:var(--mut);font-size:13px;margin:10px 0 0}
+.alt{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+.pulse{position:relative}.pulse::after{content:"";position:absolute;inset:-4px;border-radius:18px;border:2px solid var(--sage);animation:pl 1.2s ease-out infinite}
+@keyframes pl{to{transform:scale(1.3);opacity:0}}
+.fly{animation:fly .4s ease-in forwards}@keyframes fly{to{opacity:0;transform:translateX(70px) rotate(3deg) scale(.95)}}
+.cin{animation:cin .35s cubic-bezier(.2,.8,.2,1)}@keyframes cin{from{opacity:0;transform:translateX(-40px) scale(.97)}}
+.mth{width:44px;height:44px;border-radius:10px;object-fit:cover;background:var(--sl);flex:none}

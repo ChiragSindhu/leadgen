@@ -1,0 +1,17 @@
+.sheet{max-height:86vh;overflow:auto;overscroll-behavior:contain}.kv{display:flex;gap:12px;padding:11px 0;border-top:1px solid rgba(63,77,55,.08)}.kv>svg,.kv>i{color:var(--sage);margin-top:2px}
+.kv small{display:block;color:var(--mut);font-size:12px}.kv a{color:var(--sd);word-break:break-all}.qa{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin:16px 0}
+.tl{list-style:none;margin:0;padding:0}.tl li{display:flex;gap:12px;padding:7px 0;font-size:14px}.tl time{color:var(--mut);font-size:12px;min-width:48px;padding-top:2px}.tl .w{color:var(--tom)}
+dialog[open]{animation:dlgin .24s cubic-bezier(.2,.8,.2,1)}
+dialog[open]::backdrop{animation:bdin .24s ease-out}
+dialog.out{animation:dlgout .17s ease-in forwards}
+dialog.out::backdrop{animation:bdout .17s ease-in forwards}
+@keyframes dlgin{from{opacity:0;transform:translateY(14px) scale(.97)}}
+@keyframes dlgout{to{opacity:0;transform:translateY(10px) scale(.98)}}
+@keyframes bdin{from{opacity:0}}@keyframes bdout{to{opacity:0}}
+@keyframes sheetin{from{transform:translateY(100%)}}@keyframes sheetout{to{transform:translateY(100%)}}
+.grab{display:none;width:40px;height:4px;border-radius:9px;background:rgba(63,77,55,.22);margin:-8px auto 14px}
+@media(max-width:800px){dialog[open]{animation-name:sheetin;animation-duration:.3s}dialog.out{animation-name:sheetout}.grab{display:block}}
+@media(prefers-reduced-motion:reduce){.sk::after{animation:none}.pg,dialog[open],dialog[open]::backdrop,dialog.out,dialog.out::backdrop{animation-duration:.01s}}
+.qa .btn{padding:0 8px;gap:6px;font-size:13px}
+.mact{display:grid;gap:8px;margin-bottom:10px}.mact .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mact .btn{height:46px;padding:0 10px;white-space:nowrap}
+.sheet .tools .btn{flex:1 1 auto}
