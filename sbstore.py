@@ -1,4 +1,4 @@
-import os, tarfile, tempfile, shutil, requests
+import os, tarfile, tempfile, shutil, threading, uuid, requests
 
 URL = (os.getenv("SUPABASE_URL") or "").rstrip("/")
 KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
@@ -33,13 +33,34 @@ def delete(path, bucket=MEDIA_BUCKET):
     except Exception: pass
 
 # ---------- media library ----------
+_LOCKS, _LG = {}, threading.Lock()
+def _lock(mid):
+    with _LG: return _LOCKS.setdefault(mid, threading.Lock())
+
 def local_media(m):
-    """Cached on-disk copy of a media row (id, path, type)."""
+    """Cached on-disk copy of a media row (id, path, type, size).
+    Safe under concurrent requests: one download per file at a time, each into its own temp file,
+    and a cached copy is only trusted if its size matches the size stored in the database
+    (a corrupt or partial copy from an earlier run is replaced automatically)."""
     p = os.path.join(CACHE, f"{m['id']}.{MEDIA_EXT.get(m['type'], 'bin')}")
-    if not os.path.exists(p):
-        tmp = p + ".part"
-        if not download_to(m["path"], tmp): raise FileNotFoundError(m["path"])
-        os.replace(tmp, p)
+    want = int(m.get("size") or 0)
+    def good():
+        try: n = os.path.getsize(p)
+        except OSError: return False
+        return n > 0 and (not want or n == want)
+    if good(): return p
+    with _lock(m["id"]):
+        if good(): return p                                   # another request finished it while we waited
+        tmp = f"{p}.{uuid.uuid4().hex}.part"
+        try:
+            if not download_to(m["path"], tmp): raise FileNotFoundError(m["path"])
+            n = os.path.getsize(tmp)
+            if n == 0 or (want and n != want): raise IOError(f"incomplete download ({n} of {want} bytes)")
+            os.replace(tmp, p)
+        finally:
+            if os.path.exists(tmp):
+                try: os.remove(tmp)
+                except OSError: pass
     return p
 
 def purge_cache(mid):

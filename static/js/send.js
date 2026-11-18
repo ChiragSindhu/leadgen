@@ -51,19 +51,26 @@ function openSendAll(){if(BUSY)return toast(busyMsg());const max=Math.min(Q.leng
 /* Why the old code failed: navigator.share() must run inside the tap's "user activation" (about 5 seconds).
    It downloaded the files first, so 4 videos took too long and the browser refused with "Must be handling a user gesture".
    Fix: download the files in the background as soon as they are known (warmMedia), and on tap call share() immediately. */
-let MWP=null;
+let MWP=null,MWD=0,MWT=0;const MWF=new Set();
 const mrdy=()=>mon().every(m=>BL.has(m.id));
+/* download one file; accept it only if it is complete (size matches what the server stored), otherwise retry.
+   A truncated or empty file is what makes WhatsApp say "can't share empty message". */
+async function loadBlob(m){for(let i=0;i<3;i++){
+  try{const r=await fetch('/api/media/'+enc(m.id)+'/file',{cache:'no-store'});if(!r.ok)throw 0;const b=await r.blob();if(b.size&&(!m.size||b.size===m.size)){BL.set(m.id,b);return true}}catch(e){}
+  await new Promise(r=>setTimeout(r,400*(i+1)))}return false}
 function warmMedia(){if(MWP)return MWP;const todo=mon().filter(m=>!BL.has(m.id));if(!todo.length)return Promise.resolve();
- MWP=Promise.all(todo.map(async m=>{try{const r=await fetch('/api/media/'+enc(m.id)+'/file');if(!r.ok)throw 0;BL.set(m.id,await r.blob())}catch(e){}})).finally(()=>{MWP=null;drawIf()});
+ MWF.clear();MWT=todo.length;MWD=0;
+ MWP=(async()=>{for(const m of todo){if(!await loadBlob(m))MWF.add(m.id);MWD++;drawIf()}})().finally(()=>{MWP=null;drawIf()});
  drawIf();return MWP}
-const mlab=()=>MWP?'<span class="spinner"></span>Preparing media...':`${ic('image')}Send media (${mon().length} file${mon().length>1?'s':''})`;
+const mlab=()=>MWP?`<span class="spinner"></span>Preparing media... ${MWD}/${MWT}`:MWF.size&&!mrdy()?`${ic('rotate-cw')}Try again (${MWF.size} failed to load)`:`${ic('image')}Send media (${mon().length} file${mon().length>1?'s':''})`;
 function dlFiles(files){files.forEach((f,i)=>setTimeout(()=>{const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},i*350));
  toast(`${files.length} file${files.length>1?'s':''} saved to your Downloads folder. Drag ${files.length>1?'them':'it'} into the chat.`)}
 function shareMedia(id){            // intentionally NOT async: no await may happen before share()
  if(BUSY)return toast(busyMsg());
  const ms=mon();if(!ms.length)return toast('No media is switched on. Tick files in Settings > Media.');
- if(MWP)return toast('Still preparing your media. Tap again in a moment.');
- if(!mrdy()){warmMedia();return toast('Loading your media. Tap again in a moment.')}
+ if(MWP)return;
+ if(!mrdy()){warmMedia();return toast('Loading your media again...')}
+ if(ms.some(m=>!BL.get(m.id)||!BL.get(m.id).size)){ms.forEach(m=>BL.delete(m.id));warmMedia();return toast('A file did not load fully. Reloading it...')}
  const files=ms.map(m=>new File([BL.get(m.id)],m.name||m.id,{type:m.type})),done=()=>{STG.set(id,2);drawIf()};
  if(navigator.canShare&&navigator.canShare({files})){
   navigator.share({files}).then(()=>{toast('Shared. Pick WhatsApp and the same chat.');done()})
