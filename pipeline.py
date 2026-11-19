@@ -7,6 +7,7 @@ from urllib.parse import quote
 import phonenumbers
 import psycopg2, psycopg2.extras
 import queue, shutil, psutil
+import math, requests
 
 from google_source import fetch_google, GoogleError           # noqa: F401  (re-exported for callers)
 from osm_source import fetch_osm, OSMUnavailable, OSM_TAGS, osm_selectors   # noqa: F401
@@ -317,11 +318,29 @@ def sweep_orphans():
         except psutil.Error: pass
     return n
 
+PER_SEARCH_MAX = 120
+
+def plan_cells(location, target, step_km=1.2, zoom=16):
+    """Grid of map viewports over the location's bounding box, nearest to the centre first."""
+    r = requests.get("https://nominatim.openstreetmap.org/search", params={"q": location, "format": "json", "limit": 1},
+                     headers={"User-Agent": "leadpipe/1.3 (personal lead tool)"}, timeout=20).json()
+    if not r: return []
+    s, n, w, e = map(float, r[0]["boundingbox"]); clat, clng = float(r[0]["lat"]), float(r[0]["lon"])
+    kx = max(math.cos(math.radians(clat)), 0.2)
+    rows = max(1, round((n - s) / (step_km / 111.0))); cols = max(1, round((e - w) / (step_km / (111.0 * kx))))
+    cells = [(s + (i + .5) * (n - s) / rows, w + (j + .5) * (e - w) / cols) for i in range(rows) for j in range(cols)]
+    cells.sort(key=lambda c: (c[0] - clat) ** 2 + ((c[1] - clng) * kx) ** 2)
+    max_cells = min(150, max(3, target // 15))
+    return [f"{la:.5f},{ln:.5f},{zoom}" for la, ln in cells[:max_cells]]
+
 def enqueue_scrape(query, location, limit=30):
+    try: cells = plan_cells(location, limit)
+    except Exception: cells = []                      # fall back to a plain text search
     c = db()
     rid = c.execute("INSERT INTO runs(at,query,source,fetched,added,changed,calls,location,status,requested,params,attempts) VALUES(?,?,?,0,0,0,0,?,?,?,?,0) RETURNING id",
-                    (now(), query, "scrape", location, "queued", limit, json.dumps(dict(query=query, location=location, limit=limit)))).fetchone()[0]
-    c.execute("INSERT INTO run_events(run_id,at,kind,text) VALUES(?,?,?,?)", (rid, now(), "queued", f"Queued: {query} in {location} (up to {limit})"))
+                    (now(), query, "scrape", location, "queued", limit, json.dumps(dict(query=query, location=location, limit=limit, cells=cells)))).fetchone()[0]
+    c.execute("INSERT INTO run_events(run_id,at,kind,text) VALUES(?,?,?,?)", (rid, now(), "queued",
+              f"Queued: {query} in {location}, {limit} new places across {len(cells) or 1} search area(s)"))
     c.commit(); c.close(); return rid
 
 def claim_job(worker_id, run_id=None):
@@ -352,52 +371,46 @@ def reap_stale(max_age=120):
 def execute_job(job, on_progress=None):
     with _JOB_SLOT:                      # never two scrapes (= two Chromiums) in this process
         return _execute_job(job, on_progress)
-
+    
 def _execute_job(job, on_progress=None):
     rid, wid = job["id"], job["worker_id"]
     p = json.loads(job["params"] or "{}"); query, location, limit = p["query"], p["location"], int(p.get("limit") or 30)
     c = db()
     t = dict(fetched=job["fetched"] or 0, added=job["added"] or 0, changed=job["changed"] or 0, nc=job["no_contact"] or 0, blocked=False, err=None, n_ev=0)
-    prog = dict(run_id=rid, total=0, done=0, collected=t["fetched"], skipped=0, phase="Opening Google Maps")
+    remaining = max(limit - t["added"], 0)
+    prog = dict(run_id=rid, total=limit, done=t["added"], collected=t["fetched"], skipped=0, phase="Opening Google Maps")
     def ev(kind, text):
         t["n_ev"] += 1
-        if t["n_ev"] > 3000 and kind not in ("end", "error"): return
+        if t["n_ev"] > 12000 and kind not in ("end", "error"): return
         c.execute("INSERT INTO run_events(run_id,at,kind,text) VALUES(?,?,?,?)", (rid, now(), kind, text[:600])); c.commit()
         if on_progress: on_progress(dict(prog))
     def hb():
-        c.execute("UPDATE runs SET heartbeat_at=?,fetched=?,added=?,changed=?,no_contact=? WHERE id=?",
-                  (now(), t["fetched"], t["added"], t["changed"], t["nc"], rid)); c.commit()
-    ev("start", f"Attempt {job['attempts']}/{MAX_ATTEMPTS}: {query} in {location} (up to {limit}) [{wid}]")
+        c.execute("UPDATE runs SET heartbeat_at=?,fetched=?,added=?,changed=?,no_contact=? WHERE id=?", (now(), t["fetched"], t["added"], t["changed"], t["nc"], rid)); c.commit()
+    ev("start", f"Attempt {job['attempts']}/{MAX_ATTEMPTS}: {query} in {location} (up to {remaining} new places) [{wid}]")
     tmpd = tempfile.mkdtemp(prefix="scrape_"); skipf = os.path.join(tmpd, "skip.txt")
-    skip = [r[0] for r in c.execute("SELECT maps_url FROM leads WHERE source='scrape' AND last_seen>=? AND maps_url IS NOT NULL", (job["at"],))]
-    open(skipf, "w", encoding="utf-8").write("\n".join(skip))
-    if skip: ev("info", f"Resuming: {len(skip)} places already saved by this run will be skipped")
-
+    skip = [r[0] for r in c.execute("SELECT substr(id,3) FROM leads WHERE source='scrape' AND id LIKE 's:0x%'")]
+    with open(skipf, "w", encoding="utf-8") as f: f.write("\n".join(skip))
+    ev("info", f"{len(skip)} known places will be skipped; looking for {remaining} new ones")
     def handle(line):
         if line.startswith("RESULT "):
             try: it = json.loads(line[7:])
             except ValueError: return ev("warn", "unparseable RESULT: " + line[:200])
-            res = save_row(c, dict(id=scrape_id(it), source="scrape", name=it.get("name"), category=query, phone=it.get("phone"),
-                website=it.get("website"), address=it.get("address"), lat=it.get("lat"), lng=it.get("lng"), maps_url=it.get("maps_url"),
-                rating=it.get("rating"), reviews=it.get("reviews"),
-                status="CLOSED_PERMANENTLY" if it.get("permanently_closed") else "active"), now()); c.commit()   # saved immediately
+            res = save_row(c, dict(id=scrape_id(it), source="scrape", name=it.get("name"), category=query, phone=it.get("phone"), website=it.get("website"), address=it.get("address"), lat=it.get("lat"), lng=it.get("lng"), maps_url=it.get("maps_url"), rating=it.get("rating"), reviews=it.get("reviews"), status="CLOSED_PERMANENTLY" if it.get("permanently_closed") else "active"), now()); c.commit()
             if res != "skipped":
                 t["fetched"] += 1; t["added"] += res == "added"; t["changed"] += res == "updated"
                 nc = not (it.get("phone") or it.get("website")); t["nc"] += nc
                 prog.update(collected=t["fetched"], skipped=t["nc"])
                 ev("place", f"{it.get('name')}: {it.get('phone') or 'no phone'}" + (" (no contact info)" if nc else ""))
             return
-        if m := re.match(r"found (\d+) places", line): prog.update(total=int(m[1]), phase="Reading places")
-        elif m := re.match(r"\[(\d+)/(\d+)\]", line): prog.update(done=int(m[1]))
+        if m := re.match(r"found (\d+) places", line): prog.update(phase="Reading places")
+        elif m := re.match(r"PROGRESS (\d+)/(\d+)", line): prog.update(done=int(m[1]), total=int(m[2]))
         if line.startswith("STOPPED"): t["blocked"] = True; t["err"] = line.split(":", 1)[-1].strip()[:250]
         kind = "error" if re.search(r"\b(ERROR|Traceback|Error|Exception)\b", line) else "warn" if " WARN " in line else "log"
         ev(kind, line)
-
-    cmd = [sys.executable, "-u", SCRAPER, "-q", query, "-l", location, "-n", str(limit), "-o", os.path.join(tmpd, "out.json"),
-           "--jsonl", "--skip-urls", skipf]
+    cmd = [sys.executable, "-u", SCRAPER, "-q", query, "-l", location, "-n", str(remaining), "-o", os.path.join(tmpd, "out.json"), "--jsonl", "--skip-keys", skipf]
+    for cz in p.get("cells") or []: cmd += ["-c", cz]
     reason = None; rc = None; q = queue.Queue()
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                            bufsize=1, env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"})
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1, env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUNBUFFERED": "1"})
     def pump():
         for ln in proc.stdout: q.put(ln)
         q.put(None)
@@ -428,7 +441,7 @@ def _execute_job(job, on_progress=None):
     if reason == "shutdown": status, error, fin = "queued", None, None; ev("warn", "Worker shutting down: job re-queued, will resume (no results lost)")
     elif t["blocked"]: status, error, fin = ("partial" if t["fetched"] else "failed"), t["err"], now()
     elif rc == EXIT_BUSY and not reason:
-        status, error, fin = "queued", None, None       # the single scraper slot was taken: not a failed attempt
+        status, error, fin = "queued", None, None
         c.execute("UPDATE runs SET attempts=GREATEST(COALESCE(attempts,1)-1,0) WHERE id=?", (rid,))
         ev("warn", "Another scraper process holds the single scraper slot; re-queued without using an attempt")
     elif reason or rc != 0:
@@ -436,11 +449,11 @@ def _execute_job(job, on_progress=None):
         if attempts < MAX_ATTEMPTS: status, fin = "queued", None; ev("warn", f"{error}. Re-queued for resume ({attempts}/{MAX_ATTEMPTS} attempts used)")
         else: status, fin = ("partial" if t["fetched"] else "failed"), now()
     else: status, error, fin = "done", None, now()
-    c.execute("UPDATE runs SET fetched=?,added=?,changed=?,no_contact=?,status=?,finished_at=?,error=?,heartbeat_at=? WHERE id=?",
-              (t["fetched"], t["added"], t["changed"], t["nc"], status, fin, error, now(), rid))
+    c.execute("UPDATE runs SET fetched=?,added=?,changed=?,no_contact=?,status=?,finished_at=?,error=?,heartbeat_at=? WHERE id=?", (t["fetched"], t["added"], t["changed"], t["nc"], status, fin, error, now(), rid))
     prog["phase"] = "Finished" if fin else "Re-queued"
     ev("end" if fin else "info", f"{status}: {t['fetched']} saved ({t['added']} new, {t['changed']} updated, {t['nc']} without contact)" + (f". {error}" if error else ""))
     c.commit(); c.close(); return status
+
 
 def wait_run(rid, on_progress=None, poll=3):
     c = db()

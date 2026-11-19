@@ -21,7 +21,8 @@ def find():
     if not cat or not loc: return jsonify(error="Business type and location are required"), 400
     c = P.db()
     try:
-        n = num(b.get("n", 20), 1, 100, "How many")
+        n = num(b.get("n", 20), 1, 2000, "How many")
+        if src != "scrape": n = min(n, 100)      # Google/OSM calls are capped by their APIs anyway
         rad = num(b.get("radius_km", 5), 1, 50, "Radius") if src != "scrape" else 5
         cap = num(b.get("cap", P.get_setting(c, "google_cap") or 900), 10, 100000, "Monthly cap")
         key = (b.get("api_key") or "").strip() or P.get_setting(c, "google_key") or os.getenv("GOOGLE_API_KEY", "")

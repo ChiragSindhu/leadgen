@@ -38,6 +38,9 @@ MAX_CONSEC_FAIL = 5                                   # stop instead of hammerin
 BLOCK_TILES = os.getenv("SCRAPER_BLOCK_TILES", "1") != "0"
 NODE_HEAP_MB = _env_int("SCRAPER_NODE_HEAP_MB", 64)    # Playwright's Node driver: ~140 MB -> ~110 MB. Not applied if NODE_OPTIONS is already set
 
+PER_SEARCH_MAX = _env_int("SCRAPER_PER_SEARCH_MAX", 120)  # Maps rarely lists more per search
+BREAK_EVERY = _env_int("SCRAPER_BREAK_EVERY", 25)         # rest 30-90 s after this many opened places (0 = off)
+
 ARGS = ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--no-zygote", "--disable-extensions", "--mute-audio",
         "--renderer-process-limit=1", "--disable-site-isolation-trials",
         "--blink-settings=imagesEnabled=false",       # Chromium never issues image requests -> fewer route round-trips
@@ -78,6 +81,12 @@ def parse_coords(url):
     m = COORD.search(url or ""); return (float(m[1]), float(m[2])) if m else (None, None)
 def clean_phone(item_id):
     m = re.search(r"phone:tel:([+\d]+)", item_id or ""); return m[1] if m else None
+
+KEY = re.compile(r"!1s(0x[0-9a-f]+:0x[0-9a-f]+)")
+def place_key(href):
+    m = KEY.search(href or ""); return m[1] if m else None
+def parse_cell(c):
+    la, ln, z = c.split(","); return float(la), float(ln), int(z)
 
 def nap(a=1.5, b=3.5):
     """Deliberately slow, but interruptible so SIGTERM never waits out a full pause."""
@@ -248,24 +257,30 @@ PLACE_JS = """() => {
     closed: (document.body.innerText || '').toLowerCase().includes('permanently closed')};
 }"""
 
-def collect_links(page, limit):
+def collect_links(page, limit, known):
+    """Returns (new_links, n_known_skipped). Only places NOT in `known` count toward `limit`."""
     feed = page.locator('div[role="feed"]')
     try: feed.wait_for(timeout=FEED_TIMEOUT_MS)
     except PWTimeout:
         if blocked(page): raise Blocked("CAPTCHA / block page shown. Stop, wait, and retry later (or use the official API).")
-        return [page.url] if "/maps/place/" in page.url else []
-    links, stale = {}, 0
+        u = page.url
+        return ([u] if "/maps/place/" in u and place_key(u) not in known else []), 0
+    links, skipped, stale = {}, set(), 0
     while len(links) < limit and stale < 4 and not STOP:
         if blocked(page): raise Blocked("CAPTCHA / block page shown. Stop, wait, and retry later (or use the official API).")
-        data = page.evaluate(FEED_JS, limit)
+        data = page.evaluate(FEED_JS, 10**9)          # JS only scrolls; Python decides when we have enough new ones
         if not data: break
-        before = len(links)
-        for h in data["hrefs"]: links.setdefault(h, None)
-        if len(links) != before: log("INFO", f"collecting links: {len(links)}/{limit}")   # also keeps the parent's idle timer fed
+        before = len(links) + len(skipped)
+        for h in data["hrefs"]:
+            k = place_key(h)
+            if k and k in known: skipped.add(k)
+            else: links.setdefault(h, None)
+        total = len(links) + len(skipped)
+        if total != before: log("INFO", f"collecting links: {len(links)}/{limit} new, {len(skipped)} already known")
         if data["end"]: break
         nap(1.5, 3)
-        stale = stale + 1 if len(links) == before else 0
-    return list(links)[:limit]
+        stale = stale + 1 if total == before else 0
+    return list(links)[:limit], len(skipped)
 
 def build_place(raw, url, page_url):
     """Pure transformation of the raw DOM extract into the place dict (kept separate so it is unit-testable)."""
@@ -315,15 +330,18 @@ def load_items(path):
         except OSError: bad = "(could not move)"
         log("WARN", f"resume file unreadable ({type(e).__name__}); moved to {bad}, starting fresh"); return []
 
-def search(s, q, a):
+def search_url(q, a, cell):
+    if cell: return f"https://www.google.com/maps/search/{quote(q)}/@{cell[0]:.5f},{cell[1]:.5f},{cell[2]}z?hl=en"
+    return f"https://www.google.com/maps/search/{quote(q + ' in ' + a.location)}?hl=en"
+
+def search(s, q, a, cell, limit, known):
     for attempt in (1, 2):
         try:
             s.ensure(); t0 = time.time()
-            note_status(s.page.goto(f"https://www.google.com/maps/search/{quote(q + ' in ' + a.location)}?hl=en",
-                                    wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS), "search")
+            note_status(s.page.goto(search_url(q, a, cell), wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS), "search")
             accept_consent(s.page)
-            links = collect_links(s.page, a.max)
-            log("INFO", f"search '{q}' finished in {time.time() - t0:.1f}s with {len(links)} links"); return links
+            links, nknown = collect_links(s.page, limit, known)
+            log("INFO", f"search '{q}' finished in {time.time() - t0:.1f}s: {len(links)} new, {nknown} known"); return links, nknown
         except (Blocked, BrowserUnavailable): raise
         except (PWTimeout, PWError) as e:
             log("ERROR", f"search failed (attempt {attempt}): {type(e).__name__}: {str(e)[:200]}"); s.recover(e)
@@ -342,43 +360,60 @@ def fetch_place(s, url, i, n):
 def run(a):
     t_start = time.time()
     if sync_playwright is None: raise RuntimeError("playwright is not installed (pip install playwright && playwright install chromium)")
-    os.environ.setdefault("NODE_OPTIONS", f"--max-old-space-size={NODE_HEAP_MB}")   # inherited by the driver process
+    os.environ.setdefault("NODE_OPTIONS", f"--max-old-space-size={NODE_HEAP_MB}")
     items, code = (load_items(a.out) if a.resume and os.path.exists(a.out) else []), 0
     seen = {i.get("maps_url") for i in items}
+    known = {k for k in map(place_key, seen) if k}
     if a.skip_urls and os.path.exists(a.skip_urls):
-        with open(a.skip_urls, encoding="utf-8") as f: seen |= {l.strip() for l in f if l.strip()}
-    log("INFO", f"start; {len(seen)} places already collected, will be skipped")
-    done = failed = fails_in_row = 0; place_secs = 0.0; abort = False
+        with open(a.skip_urls, encoding="utf-8") as f: urls = {l.strip() for l in f if l.strip()}
+        seen |= urls; known |= {k for k in map(place_key, urls) if k}
+    if a.skip_keys and os.path.exists(a.skip_keys):
+        with open(a.skip_keys, encoding="utf-8") as f: known |= {l.strip() for l in f if l.strip()}
+    target = a.max                                   # NEW places to save in this run
+    cells = [parse_cell(c) for c in a.cell] or [None]
+    log("INFO", f"start; target {target} NEW places, {len(known)} known places skipped, {len(cells)} search area(s)")
+    done = failed = fails_in_row = opened = search_fails = 0; place_secs = 0.0; abort = False
     with sync_playwright() as pw:
         s = Session(pw, a.headful)
         try:
             s.ensure()
             for q in a.query:
-                if STOP or abort: break
-                print(f"\n== {q} in {a.location}", flush=True)
-                links = search(s, q, a)
-                if links is None: code = code or 4; continue
-                print(f"found {len(links)} places", flush=True)
-                for i, url in enumerate(links, 1):
-                    if STOP: break
-                    if url.split("?")[0] in seen: continue
-                    t0 = time.time()
-                    p, fail = fetch_place(s, url, i, len(links))
-                    fails_in_row = fails_in_row + 1 if fail else 0; failed += fail
-                    if fails_in_row >= MAX_CONSEC_FAIL:
-                        log("ERROR", f"{fails_in_row} places failed in a row; stopping instead of hammering Google"); code = 4; abort = True; break
-                    if p and a.skip_no_contact and not (p["phone"] or p["website"]):
-                        print(f"[{i}/{len(links)}] skipped (no contact): {p['name']}", flush=True); p = None
-                    if p:
-                        b = to_business(p, q); items.append(b); seen.add(b.get("maps_url")); save(a.out, items); done += 1
-                        print(f"[{i}/{len(links)}] {b['name']} | {b.get('phone', 'no phone')}", flush=True)
-                        if a.jsonl: print("RESULT " + json.dumps(b, ensure_ascii=False), flush=True)
-                    dur = time.time() - t0; place_secs += dur; s.n += 1
-                    if dur > 45: log("WARN", f"slow place {i}/{len(links)}: {dur:.0f}s")
-                    if (done + failed) % 10 == 0 and (done + failed):
-                        rss = tree_rss_mb()
-                        log("INFO", f"progress: {done} saved, {failed} failed, avg {place_secs / (done + failed):.1f}s/place" + (f", rss {rss:.0f} MB" if rss else ""))
-                    if not STOP: s.maybe_recycle(); nap()
+                for ci, cell in enumerate(cells, 1):
+                    if STOP or abort or done >= target: break
+                    print(f"\n== {q} | " + (f"area {ci}/{len(cells)}" if cell else a.location), flush=True)
+                    res = search(s, q, a, cell, min(target - done, PER_SEARCH_MAX), known)
+                    if res is None: search_fails += 1; continue
+                    links, nknown = res
+                    print(f"found {len(links)} places", flush=True)
+                    if nknown: log("INFO", f"{nknown} places already known: not opened")
+                    for i, url in enumerate(links, 1):
+                        if STOP or done >= target: break
+                        k = place_key(url)
+                        if (k and k in known) or url.split("?")[0] in seen: continue
+                        t0 = time.time(); opened += 1
+                        p, fail = fetch_place(s, url, i, len(links))
+                        if k: known.add(k)           # never reopen it from an overlapping area
+                        fails_in_row = fails_in_row + 1 if fail else 0; failed += fail
+                        if fails_in_row >= MAX_CONSEC_FAIL:
+                            log("ERROR", f"{fails_in_row} places failed in a row; stopping instead of hammering Google"); code = 4; abort = True; break
+                        if p and a.skip_no_contact and not (p["phone"] or p["website"]):
+                            print(f"[{i}/{len(links)}] skipped (no contact): {p['name']}", flush=True); p = None
+                        if p:
+                            b = to_business(p, q); items.append(b); seen.add(b.get("maps_url")); save(a.out, items); done += 1
+                            print(f"[{i}/{len(links)}] {b['name']} | {b.get('phone', 'no phone')}", flush=True)
+                            print(f"PROGRESS {done}/{target}", flush=True)
+                            if a.jsonl: print("RESULT " + json.dumps(b, ensure_ascii=False), flush=True)
+                        dur = time.time() - t0; place_secs += dur; s.n += 1
+                        if dur > 45: log("WARN", f"slow place {i}/{len(links)}: {dur:.0f}s")
+                        if opened % 10 == 0:
+                            rss = tree_rss_mb()
+                            log("INFO", f"progress: {done} saved, {failed} failed, avg {place_secs / opened:.1f}s/place" + (f", rss {rss:.0f} MB" if rss else ""))
+                        if not STOP:
+                            s.maybe_recycle(); nap()
+                            if BREAK_EVERY and opened % BREAK_EVERY == 0: log("INFO", "short rest between batches"); nap(30, 90)
+            if done < target and not STOP and not abort:
+                log("WARN", f"all search areas exhausted: {done}/{target} new places found")
+            if search_fails and not done and not code: code = 4
         except Blocked as e:
             print(f"STOPPED: {e}", file=sys.stderr, flush=True); code = 3
         except BrowserUnavailable as e:
@@ -401,6 +436,9 @@ def main():
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--jsonl", action="store_true", help="emit 'RESULT {json}' per place (used by the worker)")
     ap.add_argument("--skip-urls", help="file of maps_url values to skip (resume)")
+    ap.add_argument("-c", "--cell", action="append", default=[], help="lat,lng,zoom search area (repeatable)")
+    ap.add_argument("--skip-keys", help="file of place keys (0x..:0x..) already in the DB")
+    
     a = ap.parse_args()
     lock = SingleInstance(os.getenv("SCRAPER_LOCK_FILE", os.path.join(tempfile.gettempdir(), "maps_scraper.lock")))
     if not lock.acquire():

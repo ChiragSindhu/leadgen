@@ -7,7 +7,7 @@ function renderForm(){const s=(C.get('settings')||{}).d||{};
  $('#ff').innerHTML=`<p class="sub" style="margin:0 0 16px">${FD[FS]}</p><div class="field"><label>Business type</label><input id="fc" placeholder="${FS=='osm'?'real estate, pg, gym or shop=bakery':'e.g. real estate'}" value="${esc(FV.c||'')}">
  <div class="chips">${['real estate','pg','gym','clinic','salon'].map(c=>`<button data-a="fill" data-t="fc" data-v="${c}">${c}</button>`).join('')}</div></div>
  <div class="field"><label>Area and city</label><input id="fl" placeholder="Indiranagar, Bengaluru" value="${esc(FV.l??s.last_location??'')}"></div>
- <div class="field"><label>How many to keep (1 to 100)</label><input id="fn" type="number" inputmode="numeric" min="1" max="100" value="${esc(FV.n||20)}"><div class="chips">${[10,20,30,50].map(n=>`<button data-a="fill" data-t="fn" data-v="${n}">${n}</button>`).join('')}</div></div>
+ <div class="field"><label>How many to keep (1 to 2000)</label><input id="fn" type="number" inputmode="numeric" min="1" max="2000" value="${esc(FV.n||20)}"><div class="chips">${[10,20,30,50].map(n=>`<button data-a="fill" data-t="fn" data-v="${n}">${n}</button>`).join('')}</div></div>
  ${FS!='scrape'?`<div class="field"><label>Search radius in km (1 to 50)</label><input id="fr" type="number" inputmode="numeric" min="1" max="50" value="${esc(FV.r||5)}"><div class="chips">${[2,5,10,20].map(n=>`<button data-a="fill" data-t="fr" data-v="${n}">${n} km</button>`).join('')}</div></div>`:''}
  ${FS=='google'?'<div id="gx"></div>':''}<div id="fbz"></div><button class="btn block" id="fgo" data-a="find">${ic('search')}Start search</button>`;draw();fillGx();updFind()}
 function updFind(){const b=$('#fgo');if(!b)return;b.toggleAttribute('disabled',!!(FB||BUSY));
@@ -16,7 +16,7 @@ function fillGx(){const g=$('#gx');if(!g)return;const k=$('#fk');if(k)FV.k=k.val
  g.innerHTML=`<div class="field"><label>Google API key</label><input id="fk" type="password" autocomplete="off" placeholder="${s&&s.has_google_key?'Saved. Leave empty to keep it':'Paste your key'}" value="${esc(FV.k||'')}">
  ${s?`<div class="bar"><i style="width:${s.google_cap?Math.min(100,s.google_used/s.google_cap*100):0}%"></i></div><p class="sub" style="margin:6px 0 0">${esc(s.google_used)} of ${esc(s.google_cap)} calls used this month. Search stops at the cap.</p>`:`<div style="margin-top:10px">${sk('100%','8px','display:block;border-radius:9px')}</div>`}</div>`}
 function fillFind(s){const l=$('#fl');if(l&&FV.l==null&&!l.value&&s.last_location)l.value=s.last_location;fillGx()}
-async function startFind(){const n=parseInt($('#fn').value);if(!(n>=1&&n<=100))return toast('Enter a number from 1 to 100');if(BUSY)return toast(busyMsg());if(FB)return;FB=1;updFind();
+async function startFind(){const n=parseInt($('#fn').value);if(!(n>=1&&n<=2000))return toast('Enter a number from 1 to 2000');if(BUSY)return toast(busyMsg());if(FB)return;FB=1;updFind();
  try{await api('find','POST',{source:FS,category:$('#fc').value,location:$('#fl').value,n,radius_km:$('#fr')?.value,api_key:$('#fk')?.value});
   stale(/^settings/);JV=-1;JT=Date.now();paint($('#jm'),SKJ,1);poller(poll,3000,true);setTimeout(pollStatus,1000)}
  catch(e){e&&toast(e.message);pollStatus()}finally{FB=0;updFind()}}
