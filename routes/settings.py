@@ -49,7 +49,7 @@ def settings():
             if "templates" in b or "active" in b:
                 P.set_setting(c, "templates", json.dumps(items)); P.set_setting(c, "active_template", active)
                 P.set_setting(c, "template", next(t["body"] for t in items if t["id"] == active))   # the sender reads this key
-            if b.get("daily_limit"): P.set_setting(c, "daily_limit", clamp(int(b["daily_limit"]), 1, 100))
+            if b.get("daily_limit"): P.set_setting(c, "daily_limit", clamp(int(b["daily_limit"]), 1, 9999))
         out = {k: P.get_setting(c, k) for k in ("daily_limit", "last_location")}
         out.update(templates=items, active_template=active, template=next(t["body"] for t in items if t["id"] == active),
                    has_google_key=bool(P.get_setting(c, "google_key") or os.getenv("GOOGLE_API_KEY")),

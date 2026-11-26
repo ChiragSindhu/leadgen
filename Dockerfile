@@ -18,4 +18,4 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 
 # One worker on purpose: search progress is kept in memory. DATABASE_URL is set in the host's env vars.
-CMD gunicorn -w 1 --threads 4 --timeout 120 -b 0.0.0.0:${PORT:-8000} server:app
+CMD gunicorn -w 1 --threads 2 --timeout 120 -b 0.0.0.0:${PORT:-8000} server:app
