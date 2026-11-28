@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ic=n=>`<i data-lucide="${n}"></i>`,draw=()=>{try{lucide.createIcons()}catch(e){}},enc=encodeURIComponent,
 ST=['new','messaged','replied','interested','not_interested','bad_number','do_not_contact'],GRAB='<div class="grab"></div>',D1=$('#dlg'),D2=$('#dlg2');
-const TABS=[['dash','layout-dashboard','Home'],['leads','users','Leads'],['find','search','Find'],['runs','history','Runs'],['send','send','Send'],['set','settings','Settings']];
+const TABS=[['dash','layout-dashboard','Home'],['leads','users','Leads'],['agent','sparkles','Boss'],['find','search','Find'],['runs','history','Runs'],['send','send','Send'],['set','settings','Settings']];
 const sk=(w,h,x='')=>`<span class="sk" style="width:${w};height:${h};${x}"></span>`;
 const skRows=n=>Array.from({length:n},(_,i)=>`<div class="skrow">${sk('42px','42px','border-radius:14px')}<div style="flex:1">${sk([62,48,70,55,66,44,58][i%7]+'%','14px','display:block;margin-bottom:6px')}${sk('38%','11px','display:block')}</div>${sk('34px','20px')}</div>`).join('');
 const head=(t,s,a='')=>`<div class="top"><div><h1>${t}</h1><div class="sub">${s}</div></div>${a}</div>`;

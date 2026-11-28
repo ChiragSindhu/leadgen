@@ -5,7 +5,7 @@ function go(t){if(tab)SC[tab]=scrollY;tab=t;stopPoll();if(t!='leads')selOff();
  NB.forEach(b=>b.classList.toggle('on',b.dataset.t==t));PG.forEach(p=>p.hidden=p.id!='p-'+t);
  if(!INIT[t]){INIT[t]=1;SH[t]()}scrollTo(0,SC[t]||0);
  LDR[t]().catch(e=>e&&toast(e.message))}
-const PP={dash:()=>'stats',leads:()=>lk(),runs:()=>'runs',send:()=>'queue',set:()=>'settings',find:()=>'settings'};
+const PP={dash:()=>'stats',leads:()=>lk(),agent:()=>'stats',runs:()=>'runs',send:()=>'queue',set:()=>'settings',find:()=>'settings'};
 function prefetch(t){const p=PP[t]();const c=C.get(p);if(c&&!c.x&&Date.now()-c.t<15000)return;fetchC(p).catch(()=>{})}
 $('nav').addEventListener('pointerover',e=>{const b=e.target.closest('button[data-t]');if(b&&b.dataset.t!=tab)prefetch(b.dataset.t)});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&INIT[tab])LDR[tab]().catch(()=>{})});

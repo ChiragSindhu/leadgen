@@ -29,6 +29,7 @@ Object.assign(A,{
  mprev:e=>{const m=ML.find(x=>x.id==e.dataset.id);if(!m)return;const u='/api/media/'+enc(m.id)+'/file';
   showSheet(GRAB+`<div style="border-radius:14px;overflow:hidden;background:#000">${m.type.startsWith('video')?`<video src="${u}" controls playsinline style="width:100%;max-height:60vh"></video>`:`<img src="${u}" alt="" style="width:100%;max-height:60vh;object-fit:contain">`}</div><p class="sub" style="margin:10px 0">${esc(m.name)} · ${mb(m.size)}</p><button class="btn soft block" data-a="close">Close</button>`,0);openDlg(D2)},
  ins:e=>{const t=$('#tp');if(!t)return;const s=t.selectionStart??t.value.length;t.setRangeText('{'+e.dataset.v+'}',s,t.selectionEnd??s,'end');t.focus();updTpl()}});
+ Object.assign(A,agentActions(),{rk:e=>{RK=e.dataset.v;document.querySelectorAll('#rseg button').forEach(b=>b.classList.toggle('on',b.dataset.v==RK));const c=C.get('runs');c&&fillRuns(c.d)},stab:stabAction})
 document.addEventListener('change',e=>{const t=e.target;
  if(t.id=='mfile'){const f=[...t.files];t.value='';upMedia(f)}});
 document.addEventListener('toggle',e=>{if(e.target.id=='mdet')MO=e.target.open},true);
@@ -43,5 +44,5 @@ document.addEventListener('input',e=>{const t=e.target;
  else if(t.closest('#p-find'))keep();else if(t.id=='tp'||t.id=='tn')updTpl()});
 
 
-const SH={dash:shDash,leads:shLeads,find:shFind,runs:shRuns,send:shSend,set:shSet},LDR={dash:loadDash,leads:loadLeads,find:loadFind,runs:loadRuns,send:loadSend,set:loadSet};
+const SH={dash:shDash,leads:shLeads,agent:shAgent,find:shFind,runs:shRuns,send:shSend,set:shSet},LDR={dash:loadDash,leads:loadLeads,agent:loadAgent,find:loadFind,runs:loadRuns,send:loadSend,set:loadSet};
 draw();go('dash');pollStatus()

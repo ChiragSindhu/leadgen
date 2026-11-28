@@ -1,13 +1,20 @@
 /* ============ RUNS ============ */
 const RN={first:[],old:[],total:0,busy:false},RPS=30;
-function shRuns(){$('#p-runs').innerHTML=head('Runs','Every search and what happened')+`<div id="rl" class="glass list">${skRows(5)}</div><div id="rft" style="padding:14px 0;text-align:center"></div>`;
+let RK='all';
+const RS={done:['ok','Done'],running:['run','Running'],queued:['run','Queued'],partial:['w','Partial'],failed:['e','Failed']};
+const runRow=r=>{const s=RS[r.status]||RS.done,wa=r.source=='whatsapp';
+ return `<div class="lead run" data-a="run" data-id="${esc(r.id)}"><span class="st ${s[0]}"></span><div class="t"><b>${esc(r.query)}${r.location?' · '+esc(r.location):''}</b><small>${esc(when(r.at))} · ${wa?'Send':'Search'} · ${s[1]}</small></div><div class="rn"><b>${esc(r.added||0)}</b><small>${wa?'sent':'new'}</small></div><span class="chev" style="display:block">${ic('chevron-right')}</span></div>`};
+const rkOK=r=>RK=='all'||(RK=='send'?r.source=='whatsapp':RK=='find'?r.source!='whatsapp':['failed','partial'].includes(r.status));
+function shRuns(){$('#p-runs').innerHTML=head('Runs','Every search and send')+`<div id="rsum" class="rsum"></div><div class="seg" id="rseg">${[['all','All'],['find','Searches'],['send','Sends'],['bad','Problems']].map(x=>`<button data-a="rk" data-v="${x[0]}" class="${x[0]==RK?'on':''}">${x[1]}</button>`).join('')}</div><div id="rl" class="glass list">${skRows(5)}</div><div id="rft" style="padding:14px 0;text-align:center"></div>`;
  new IntersectionObserver(es=>{if(es[0].isIntersecting)runMore()},{rootMargin:'500px'}).observe($('#rft'))}
-const runRow=r=>`<div class="lead" data-a="run" data-id="${esc(r.id)}"><div class="av">${ic(r.source=='whatsapp'?'send':'search')}</div><div class="t"><b>${esc(r.query)}${r.location?' in '+esc(r.location):''}</b><small>${esc(when(r.at))} · ${esc(r.status||'done')}</small></div><span class="score">${esc(r.source=='whatsapp'?r.added:r.fetched)}</span><span class="chev" style="display:block">${ic('chevron-right')}</span></div>`;
- function fillRuns(d,older){
+
+function fillRuns(d,older){
  if(!older){RN.first=d.items;RN.total=d.total;const ids=new Set(d.items.map(r=>r.id));RN.old=RN.old.filter(r=>!ids.has(r.id))}
- const all=RN.first.concat(RN.old),more=all.length<RN.total;
- paint($('#rl'),all.length?all.map(runRow).join(''):`<div class="empty">${ic('history')}<div>No runs yet. Start one from Find.</div></div>`);
- paint($('#rft'),more?`<button class="btn soft" data-a="runmore" ${RN.busy?'disabled':''}>${RN.busy?'Loading...':`Load more (${all.length} of ${RN.total})`}</button>`:all.length?`<span class="sub">All ${RN.total} runs shown</span>`:'',1)}
+ const raw=RN.first.concat(RN.old),all=raw.filter(rkOK),more=raw.length<RN.total;
+ paint($('#rsum'),`<div><b>${RN.total}</b><small>runs</small></div><div><b>${raw.filter(r=>r.source!='whatsapp').reduce((a,r)=>a+(r.added||0),0)}</b><small>new leads</small></div><div><b>${raw.filter(r=>r.source=='whatsapp').reduce((a,r)=>a+(r.added||0),0)}</b><small>sent</small></div>`,1);
+ paint($('#rl'),all.length?all.map(runRow).join(''):`<div class="empty">${ic('history')}<div>${raw.length?'No runs match this filter.':'No runs yet. Start one from Find.'}</div></div>`);
+ paint($('#rft'),more?`<button class="btn soft" data-a="runmore" ${RN.busy?'disabled':''}>${RN.busy?'Loading...':`Load more (${raw.length} of ${RN.total})`}</button>`:raw.length?`<span class="sub">All ${RN.total} runs shown</span>`:'',1)}
+
 async function runMore(){const n=RN.first.length+RN.old.length;if(RN.busy||n>=RN.total||tab!='runs')return;RN.busy=true;fillRuns(null,1);
  try{const d=await api(`runs?limit=${RPS}&offset=${n}`),ids=new Set(RN.first.concat(RN.old).map(r=>r.id));
   RN.old=RN.old.concat(d.items.filter(r=>!ids.has(r.id)));RN.total=d.total}
@@ -32,4 +39,3 @@ function openRun(id){RF=0;const my=++DS;clearTimeout(RT);showSheet(runSkel(),0);
   try{if(document.hidden)more=true;else{const r=await fetchC(p);if(my!==DS)return;if(r.changed)fillRun(r.d);more=r.d.run.status=='running'}}catch(e){}
   if(more&&my===DS)RT=setTimeout(loop,4000)};
  swr(p,{ttl:3000,ok:()=>my===DS,render:d=>{if(my===DS)fillRun(d)}}).then(d=>{if(my===DS&&d&&d.run&&d.run.status=='running')RT=setTimeout(loop,4000)}).catch(e=>{if(e&&my===DS)showSheet(errSheet(e.message))})}
-
